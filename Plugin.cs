@@ -43,6 +43,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
     internal static bool DrinkStoredMeadsOnUseEnabled => DrinkStoredMeadsOnUse.Value == Toggle.On;
 
     private readonly Harmony _harmony = new(ModGuid);
+    private static bool _roundingMovementWhileDrinking;
 
     private void Awake()
     {
@@ -90,7 +91,8 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
             order: 500);
 
         EnableMod.SettingChanged += OnConfigChanged;
-        MovementWhileDrinking.SettingChanged += OnConfigChanged;
+        RoundMovementWhileDrinking();
+        MovementWhileDrinking.SettingChanged += OnMovementWhileDrinkingChanged;
         TankardStorage.SettingChanged += OnConfigChanged;
         DrinkStoredMeadsOnUse.SettingChanged += OnConfigChanged;
 
@@ -127,6 +129,36 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
     private static void OnConfigChanged(object sender, EventArgs args)
     {
         TankardTweaks.ApplyItemDefinitions();
+    }
+
+    private static void OnMovementWhileDrinkingChanged(object sender, EventArgs args)
+    {
+        RoundMovementWhileDrinking();
+    }
+
+    private static void RoundMovementWhileDrinking()
+    {
+        if (MovementWhileDrinking == null || _roundingMovementWhileDrinking)
+        {
+            return;
+        }
+
+        float clamped = Math.Min(1f, Math.Max(0f, MovementWhileDrinking.Value));
+        float rounded = (float)Math.Round(clamped, 2, MidpointRounding.AwayFromZero);
+        if (Math.Abs(MovementWhileDrinking.Value - rounded) <= 0.0001f)
+        {
+            return;
+        }
+
+        try
+        {
+            _roundingMovementWhileDrinking = true;
+            MovementWhileDrinking.Value = rounded;
+        }
+        finally
+        {
+            _roundingMovementWhileDrinking = false;
+        }
     }
 
     private void OnDestroy()

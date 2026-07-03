@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="ILRepacker" AfterTargets="Build">
+    <ItemGroup>
+      <RepackReferenceFiles Include="$(BepInExPath)\core\BepInEx.dll" />
+      <RepackReferenceFiles Include="$(BepInExPath)\core\0Harmony.dll" />
+      <RepackReferenceFiles Include="$(PublicizedAssembliesPath)\assembly_valheim_publicized.dll" />
+      <RepackReferenceFiles Include="$(PublicizedAssembliesPath)\assembly_utils_publicized.dll" />
+      <RepackReferenceFiles Include="$(PublicizedAssembliesPath)\assembly_guiutils_publicized.dll" />
+      <RepackReferenceFiles Include="$(CorlibPath)\netstandard.dll" />
+      <RepackReferenceFiles Include="$(CorlibPath)\UnityEngine.dll" />
+      <RepackReferenceFiles Include="$(CorlibPath)\UnityEngine.CoreModule.dll" />
+      <RepackReferenceFiles Include="$(CorlibPath)\UnityEngine.InputLegacyModule.dll" />
+      <InputAssemblies Include="$(TargetPath)" />
+      <InputAssemblies Include="$(ProjectDir)Libs\ServerSync.dll" />
+      <RepackLibraryPath Include="$(TargetDir)" />
+      <RepackLibraryPath Include="$(BepInExPath)\core" Condition="Exists('$(BepInExPath)\core')" />
+      <RepackLibraryPath Include="$(CorlibPath)" Condition="Exists('$(CorlibPath)')" />
+      <RepackLibraryPath Include="$(PublicizedAssembliesPath)" Condition="Exists('$(PublicizedAssembliesPath)')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(RepackReferenceFiles)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+    <ILRepack
+      Parallel="true"
+      DebugInfo="true"
+      Internalize="true"
+      InputAssemblies="@(InputAssemblies)"
+      OutputFile="$(TargetPath)"
+      TargetKind="SameAsPrimaryAssembly"
+      LibraryPath="@(RepackLibraryPath)" />
+    <Delete Files="$(TargetDir)BepInEx.dll;$(TargetDir)0Harmony.dll;$(TargetDir)assembly_valheim_publicized.dll;$(TargetDir)assembly_utils_publicized.dll;$(TargetDir)assembly_guiutils_publicized.dll;$(TargetDir)netstandard.dll;$(TargetDir)UnityEngine.dll;$(TargetDir)UnityEngine.CoreModule.dll;$(TargetDir)UnityEngine.InputLegacyModule.dll" />
+  </Target>
+</Project>
