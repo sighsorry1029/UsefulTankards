@@ -100,7 +100,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
 
         TankardTweaks.RegisterProfile(
             this,
-            "2 - Tankard",
+            "02 - Tankard",
             "Tankard",
             durability: 10,
             cooldownReduction: 0.10f,
@@ -108,7 +108,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
             storageSlots: 3);
         TankardTweaks.RegisterProfile(
             this,
-            "3 - Anniversary Tankard",
+            "03 - Anniversary Tankard",
             "TankardAnniversary",
             durability: 15,
             cooldownReduction: 0.20f,
@@ -116,7 +116,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
             storageSlots: 4);
         TankardTweaks.RegisterProfile(
             this,
-            "4 - Dvergr Tankard",
+            "04 - Dvergr Tankard",
             "Tankard_dvergr",
             durability: 20,
             cooldownReduction: 0.30f,
