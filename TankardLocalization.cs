@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using HarmonyLib;
 
 namespace UsefulTankards;
@@ -14,6 +15,7 @@ internal static class TankardLocalization
     private const string CooldownReductionWord = "ut_tankard_cooldown_reduction";
     private const string BuffDurationBonusWord = "ut_tankard_buff_duration_bonus";
     private const string EnglishLanguage = "english";
+    private static readonly MethodInfo? AddWordMethod = AccessTools.Method(typeof(Localization), "AddWord", new[] { typeof(string), typeof(string) });
 
     private static readonly Dictionary<string, string> OpenHintByLanguage = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -49,9 +51,9 @@ internal static class TankardLocalization
         }
 
         string languageName = NormalizeLanguageName(localization.GetSelectedLanguage());
-        localization.AddWord(OpenHintWord, Get(OpenHintByLanguage, languageName));
-        localization.AddWord(CooldownReductionWord, Get(CooldownReductionByLanguage, languageName));
-        localization.AddWord(BuffDurationBonusWord, Get(BuffDurationBonusByLanguage, languageName));
+        AddWord(localization, OpenHintWord, Get(OpenHintByLanguage, languageName));
+        AddWord(localization, CooldownReductionWord, Get(CooldownReductionByLanguage, languageName));
+        AddWord(localization, BuffDurationBonusWord, Get(BuffDurationBonusByLanguage, languageName));
     }
 
     internal static string Localize(string key)
@@ -77,6 +79,11 @@ internal static class TankardLocalization
         return translations.TryGetValue(languageName, out string translation)
             ? translation
             : translations[EnglishLanguage];
+    }
+
+    private static void AddWord(Localization localization, string key, string value)
+    {
+        AddWordMethod?.Invoke(localization, new object[] { key, value });
     }
 }
 
