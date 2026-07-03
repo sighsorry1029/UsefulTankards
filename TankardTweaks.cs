@@ -62,7 +62,7 @@ internal static class TankardTweaks
     }
 
     internal static void RegisterProfile(
-        ConfigFile config,
+        UsefulTankardsPlugin plugin,
         string section,
         string prefabName,
         int durability,
@@ -72,26 +72,30 @@ internal static class TankardTweaks
     {
         TankardProfile profile = new TankardProfile(
             prefabName,
-            config.Bind(
+            plugin.ConfigEntry(
                 section,
                 "Durability Uses",
                 durability,
-                new ConfigDescription("Tankard uses before it can no longer be used. 0 disables durability changes for this tankard.", new AcceptableValueRange<int>(0, 1000))),
-            config.Bind(
+                new ConfigDescription("Tankard uses before it can no longer be used. 0 disables durability changes for this tankard.", new AcceptableValueRange<int>(0, 1000)),
+                order: 400),
+            plugin.ConfigEntry(
                 section,
                 "Potion Cooldown Reduction",
                 cooldownReduction,
-                new ConfigDescription("Multiplier-style reduction for pure over-time potions drunk through this tankard. 0.10 means -10%.", new AcceptableValueRange<float>(0f, 0.95f))),
-            config.Bind(
+                new ConfigDescription("Multiplier-style reduction for pure over-time potions drunk through this tankard. 0.10 means -10%.", new AcceptableValueRange<float>(0f, 0.95f)),
+                order: 300),
+            plugin.ConfigEntry(
                 section,
                 "Buff Duration Bonus",
                 durationBonus,
-                new ConfigDescription("Duration bonus for non-over-time buffs drunk through this tankard. 0.10 means +10%.", new AcceptableValueRange<float>(0f, 10f))),
-            config.Bind(
+                new ConfigDescription("Duration bonus for non-over-time buffs drunk through this tankard. 0.10 means +10%.", new AcceptableValueRange<float>(0f, 10f)),
+                order: 200),
+            plugin.ConfigEntry(
                 section,
                 "Storage Slots",
                 storageSlots,
-                new ConfigDescription("Number of mead storage slots in this tankard. 0 disables storage for this tankard.", new AcceptableValueRange<int>(0, 20))));
+                new ConfigDescription("Number of mead storage slots in this tankard. 0 disables storage for this tankard.", new AcceptableValueRange<int>(0, 20)),
+                order: 100));
         profile.Durability.SettingChanged += (_, _) => ApplyItemDefinitions();
         Profiles[prefabName] = profile;
     }
@@ -99,7 +103,7 @@ internal static class TankardTweaks
     internal static bool TryGetProfile(ItemDrop.ItemData? item, out TankardProfile profile)
     {
         profile = null!;
-        if (!UsefulTankardsPlugin.EnableMod.Value || item == null)
+        if (!UsefulTankardsPlugin.ModEnabled || item == null)
         {
             return false;
         }
@@ -111,7 +115,7 @@ internal static class TankardTweaks
     internal static bool TryGetProfile(GameObject? prefab, out TankardProfile profile)
     {
         profile = null!;
-        if (!UsefulTankardsPlugin.EnableMod.Value || prefab == null || (UnityEngine.Object)(object)prefab == null)
+        if (!UsefulTankardsPlugin.ModEnabled || prefab == null || (UnityEngine.Object)(object)prefab == null)
         {
             return false;
         }
@@ -144,7 +148,7 @@ internal static class TankardTweaks
     internal static void ModifyEffectForCurrentTankard(StatusEffect effect)
     {
         TankardProfile? profile = CurrentUseContext;
-        if (!UsefulTankardsPlugin.EnableMod.Value || profile == null || effect.m_ttl <= 0f)
+        if (!UsefulTankardsPlugin.ModEnabled || profile == null || effect.m_ttl <= 0f)
         {
             return;
         }
@@ -163,7 +167,7 @@ internal static class TankardTweaks
         }
 
         List<string> lines = new();
-        if (UsefulTankardsPlugin.TankardStorage.Value && profile.TankardStorageSlots > 0)
+        if (UsefulTankardsPlugin.TankardStorageEnabled && profile.TankardStorageSlots > 0)
         {
             lines.Add(TankardLocalization.Localize(TankardLocalization.OpenHintKey));
         }
@@ -217,7 +221,7 @@ internal static class TankardTweaks
             DurabilityBaselines[prefabName] = DurabilityBaseline.From(shared);
         }
 
-        if (!UsefulTankardsPlugin.EnableMod.Value || profile.DurabilityUses <= 0)
+        if (!UsefulTankardsPlugin.ModEnabled || profile.DurabilityUses <= 0)
         {
             DurabilityBaselines[prefabName].Restore(shared);
             return;

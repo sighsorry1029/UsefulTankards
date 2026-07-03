@@ -52,7 +52,7 @@ internal static class TankardStorageSystem
 
     internal static bool CanAddTankardToPlayerInventory(Inventory inventory, ItemDrop.ItemData item, Inventory? fromInventory = null)
     {
-        if (!UsefulTankardsPlugin.EnableMod.Value ||
+        if (!UsefulTankardsPlugin.ModEnabled ||
             UsefulTankardsPlugin.MaxTankardsInInventory.Value <= 0 ||
             inventory == null ||
             item == null ||
@@ -79,7 +79,7 @@ internal static class TankardStorageSystem
 
     internal static bool CanAddTankardToPlayerInventory(Inventory inventory, GameObject prefab)
     {
-        if (!UsefulTankardsPlugin.EnableMod.Value ||
+        if (!UsefulTankardsPlugin.ModEnabled ||
             UsefulTankardsPlugin.MaxTankardsInInventory.Value <= 0 ||
             inventory == null ||
             prefab == null ||
@@ -115,8 +115,8 @@ internal static class TankardStorageSystem
 
     internal static bool TryHandleInventoryGuiUseInput(InventoryGui inventoryGui)
     {
-        if (!UsefulTankardsPlugin.EnableMod.Value ||
-            !UsefulTankardsPlugin.TankardStorage.Value ||
+        if (!UsefulTankardsPlugin.ModEnabled ||
+            !UsefulTankardsPlugin.TankardStorageEnabled ||
             inventoryGui == null ||
             Player.m_localPlayer == null)
         {
@@ -163,9 +163,9 @@ internal static class TankardStorageSystem
     internal static bool TryConsumeStoredDrinks(Player player, ItemDrop.ItemData tankard, TankardProfile profile, out ItemDrop.ItemData consumedAmmo)
     {
         consumedAmmo = null!;
-        if (!UsefulTankardsPlugin.EnableMod.Value ||
-            !UsefulTankardsPlugin.TankardStorage.Value ||
-            !UsefulTankardsPlugin.DrinkStoredMeadsOnUse.Value ||
+        if (!UsefulTankardsPlugin.ModEnabled ||
+            !UsefulTankardsPlugin.TankardStorageEnabled ||
+            !UsefulTankardsPlugin.DrinkStoredMeadsOnUseEnabled ||
             player == null ||
             tankard == null ||
             profile.TankardStorageSlots <= 0)
@@ -211,9 +211,9 @@ internal static class TankardStorageSystem
 
     internal static bool HasConsumableStoredDrink(Player player, ItemDrop.ItemData tankard, TankardProfile profile)
     {
-        if (!UsefulTankardsPlugin.EnableMod.Value ||
-            !UsefulTankardsPlugin.TankardStorage.Value ||
-            !UsefulTankardsPlugin.DrinkStoredMeadsOnUse.Value ||
+        if (!UsefulTankardsPlugin.ModEnabled ||
+            !UsefulTankardsPlugin.TankardStorageEnabled ||
+            !UsefulTankardsPlugin.DrinkStoredMeadsOnUseEnabled ||
             player == null ||
             tankard == null ||
             profile.TankardStorageSlots <= 0)

@@ -25,8 +25,8 @@ internal static class UsefulTankardsAttackMovementSpeedPatch
 {
     private static void Postfix(Humanoid __instance, ref float __result)
     {
-        if (UsefulTankardsPlugin.EnableMod.Value
-            && UsefulTankardsPlugin.MovementWhileDrinking.Value
+        if (UsefulTankardsPlugin.ModEnabled
+            && UsefulTankardsPlugin.MovementWhileDrinkingEnabled
             && __instance.InAttack()
             && TankardTweaks.TryGetProfile(__instance.GetCurrentWeapon(), out _))
         {
@@ -40,8 +40,8 @@ internal static class UsefulTankardsAttackRotationSpeedPatch
 {
     private static void Postfix(Humanoid __instance, ref float __result)
     {
-        if (UsefulTankardsPlugin.EnableMod.Value
-            && UsefulTankardsPlugin.MovementWhileDrinking.Value
+        if (UsefulTankardsPlugin.ModEnabled
+            && UsefulTankardsPlugin.MovementWhileDrinkingEnabled
             && __instance.InAttack()
             && TankardTweaks.TryGetProfile(__instance.GetCurrentWeapon(), out _))
         {
