@@ -1,0 +1,21 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UsefulTankards", "UsefulTankards.csproj", "{C4125E26-AB66-46F5-B6B3-4A4C3D11E57E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C4125E26-AB66-46F5-B6B3-4A4C3D11E57E}.Debug|Any CPU.ActiveCfg = Debug|AnyCPU
+		{C4125E26-AB66-46F5-B6B3-4A4C3D11E57E}.Debug|Any CPU.Build.0 = Debug|AnyCPU
+		{C4125E26-AB66-46F5-B6B3-4A4C3D11E57E}.Release|Any CPU.ActiveCfg = Release|AnyCPU
+		{C4125E26-AB66-46F5-B6B3-4A4C3D11E57E}.Release|Any CPU.Build.0 = Release|AnyCPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
