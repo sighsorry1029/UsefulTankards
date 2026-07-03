@@ -57,7 +57,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
         MovementWhileDrinking = ConfigEntry(
             "1 - General",
             "Movement While Drinking",
-            1f,
+            0.5f,
             new ConfigDescription(
                 "Movement and rotation speed multiplier while drinking through a tankard. 0 keeps vanilla movement lock; 1 allows normal movement.",
                 new AcceptableValueRange<float>(0f, 1f)),
