@@ -1,4 +1,5 @@
 using HarmonyLib;
+using UnityEngine;
 
 namespace UsefulTankards;
 
@@ -26,11 +27,11 @@ internal static class UsefulTankardsAttackMovementSpeedPatch
     private static void Postfix(Humanoid __instance, ref float __result)
     {
         if (UsefulTankardsPlugin.ModEnabled
-            && UsefulTankardsPlugin.MovementWhileDrinkingEnabled
+            && UsefulTankardsPlugin.MovementWhileDrinkingMultiplier > 0f
             && __instance.InAttack()
             && TankardTweaks.TryGetProfile(__instance.GetCurrentWeapon(), out _))
         {
-            __result = 1f;
+            __result = Mathf.Max(__result, UsefulTankardsPlugin.MovementWhileDrinkingMultiplier);
         }
     }
 }
@@ -41,11 +42,11 @@ internal static class UsefulTankardsAttackRotationSpeedPatch
     private static void Postfix(Humanoid __instance, ref float __result)
     {
         if (UsefulTankardsPlugin.ModEnabled
-            && UsefulTankardsPlugin.MovementWhileDrinkingEnabled
+            && UsefulTankardsPlugin.MovementWhileDrinkingMultiplier > 0f
             && __instance.InAttack()
             && TankardTweaks.TryGetProfile(__instance.GetCurrentWeapon(), out _))
         {
-            __result = 1f;
+            __result = Mathf.Max(__result, UsefulTankardsPlugin.MovementWhileDrinkingMultiplier);
         }
     }
 }

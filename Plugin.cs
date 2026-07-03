@@ -32,13 +32,13 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
 
     private static ConfigEntry<Toggle> ServerConfigLocked = null!;
     internal static ConfigEntry<Toggle> EnableMod = null!;
-    internal static ConfigEntry<Toggle> MovementWhileDrinking = null!;
+    internal static ConfigEntry<float> MovementWhileDrinking = null!;
     internal static ConfigEntry<Toggle> TankardStorage = null!;
     internal static ConfigEntry<Toggle> DrinkStoredMeadsOnUse = null!;
     internal static ConfigEntry<int> MaxTankardsInInventory = null!;
 
     internal static bool ModEnabled => EnableMod.Value == Toggle.On;
-    internal static bool MovementWhileDrinkingEnabled => MovementWhileDrinking.Value == Toggle.On;
+    internal static float MovementWhileDrinkingMultiplier => Math.Min(1f, Math.Max(0f, MovementWhileDrinking.Value));
     internal static bool TankardStorageEnabled => TankardStorage.Value == Toggle.On;
     internal static bool DrinkStoredMeadsOnUseEnabled => DrinkStoredMeadsOnUse.Value == Toggle.On;
 
@@ -65,8 +65,10 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
         MovementWhileDrinking = ConfigEntry(
             "1 - General",
             "Movement While Drinking",
-            Toggle.On,
-            "Allow movement and rotation while drinking through a tankard.",
+            1f,
+            new ConfigDescription(
+                "Movement and rotation speed multiplier while drinking through a tankard. 0 keeps vanilla movement lock; 1 allows normal movement.",
+                new AcceptableValueRange<float>(0f, 1f)),
             order: 800);
         TankardStorage = ConfigEntry(
             "1 - General",
