@@ -12,6 +12,8 @@ internal static class ValheimAccess
     private static readonly FieldInfo? ContainerHeightField = AccessTools.Field(typeof(Container), "m_height");
     private static readonly FieldInfo? ContainerInventoryField = AccessTools.Field(typeof(Container), "m_inventory");
     private static readonly FieldInfo? ContainerInUseField = AccessTools.Field(typeof(Container), "m_inUse");
+    private static readonly MethodInfo? InventoryGuiCloseContainerMethod = AccessTools.Method(typeof(InventoryGui), nameof(InventoryGui.CloseContainer));
+    private static readonly MethodInfo? InventoryChangedMethod = AccessTools.Method(typeof(Inventory), nameof(Inventory.Changed));
 
     internal static Container? GetCurrentContainer(InventoryGui? gui)
     {
@@ -40,5 +42,18 @@ internal static class ValheimAccess
     internal static bool GetContainerInUse(Container container)
     {
         return ContainerInUseField?.GetValue(container) as bool? ?? false;
+    }
+
+    internal static void CloseContainer(InventoryGui gui)
+    {
+        InventoryGuiCloseContainerMethod?.Invoke(gui, null);
+    }
+
+    internal static void Changed(Inventory? inventory)
+    {
+        if (inventory != null)
+        {
+            InventoryChangedMethod?.Invoke(inventory, null);
+        }
     }
 }

@@ -81,7 +81,7 @@ internal static class TankardStorageSystem
             }
 
             ZInput.ResetButtonStatus("Use");
-            inventoryGui.CloseContainer();
+            ValheimAccess.CloseContainer(inventoryGui);
             return true;
         }
 
@@ -149,8 +149,31 @@ internal static class TankardStorageSystem
             }
 
             SaveTankardStorageInventory(tankard, inventory);
-            player.GetInventory()?.Changed();
+            ValheimAccess.Changed(player.GetInventory());
             return true;
+        }
+        finally
+        {
+            UnregisterTankardStorageInventory(inventory);
+        }
+    }
+
+    internal static bool HasConsumableStoredDrink(Player player, ItemDrop.ItemData tankard, TankardProfile profile)
+    {
+        if (!UsefulTankardsPlugin.EnableMod.Value ||
+            !UsefulTankardsPlugin.TankardStorage.Value ||
+            !UsefulTankardsPlugin.DrinkStoredMeadsOnUse.Value ||
+            player == null ||
+            tankard == null ||
+            profile.TankardStorageSlots <= 0)
+        {
+            return false;
+        }
+
+        Inventory inventory = LoadTankardStorageInventory(player, tankard, profile, out _, out _);
+        try
+        {
+            return inventory.GetAllItems().Any(item => CanConsumeStoredDrinkQuietly(player, tankard, item));
         }
         finally
         {

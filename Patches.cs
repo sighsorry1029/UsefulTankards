@@ -76,6 +76,23 @@ internal static class UsefulTankardsUseAmmoPatch
     }
 }
 
+[HarmonyPatch(typeof(Attack), nameof(Attack.HaveAmmo))]
+internal static class UsefulTankardsHaveAmmoPatch
+{
+    private static bool Prefix(Humanoid character, ItemDrop.ItemData weapon, ref bool __result)
+    {
+        if (!TankardTweaks.TryGetProfile(weapon, out TankardProfile profile) ||
+            character is not Player player ||
+            !TankardStorageSystem.HasConsumableStoredDrink(player, weapon, profile))
+        {
+            return true;
+        }
+
+        __result = true;
+        return false;
+    }
+}
+
 [HarmonyPatch(typeof(StatusEffect), nameof(StatusEffect.Setup))]
 internal static class UsefulTankardsStatusEffectSetupPatch
 {
