@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -15,6 +14,10 @@ internal static class TankardStorageSystem
     private static readonly HashSet<Inventory> StorageInventories = new();
     private static readonly Dictionary<Inventory, ItemDrop.ItemData> InventoryOwners = new();
     private static float _nextLimitMessageTime;
+    private static Player? _cachedStoredDrinkPlayer;
+    private static ItemDrop.ItemData? _cachedStoredDrinkTankard;
+    private static int _cachedStoredDrinkFrame = -1;
+    private static bool _cachedStoredDrinkResult;
 
     internal static bool IsTankardStorageInventory(Inventory inventory)
     {
@@ -187,12 +190,19 @@ internal static class TankardStorageSystem
             return false;
         }
 
+        if (!tankard.m_customData.TryGetValue(StorageDataKey, out string rawData) || string.IsNullOrWhiteSpace(rawData))
+        {
+            return false;
+        }
+
         Inventory inventory = LoadTankardStorageInventory(player, tankard, profile, out _, out _);
         try
         {
             bool consumedAny = false;
-            foreach (ItemDrop.ItemData item in inventory.GetAllItems().ToList())
+            List<ItemDrop.ItemData> items = inventory.GetAllItems();
+            for (int i = items.Count - 1; i >= 0; --i)
             {
+                ItemDrop.ItemData item = items[i];
                 if (!CanConsumeStoredDrinkQuietly(player, tankard, item))
                 {
                     continue;
@@ -214,6 +224,7 @@ internal static class TankardStorageSystem
             }
 
             SaveTankardStorageInventory(tankard, inventory);
+            ClearStoredDrinkCheckCache();
             ValheimAccess.Changed(player.GetInventory());
             return true;
         }
@@ -235,10 +246,40 @@ internal static class TankardStorageSystem
             return false;
         }
 
+        if (ReferenceEquals(_cachedStoredDrinkPlayer, player) &&
+            ReferenceEquals(_cachedStoredDrinkTankard, tankard) &&
+            _cachedStoredDrinkFrame == Time.frameCount)
+        {
+            return _cachedStoredDrinkResult;
+        }
+
+        bool result = HasConsumableStoredDrinkUncached(player, tankard, profile);
+        _cachedStoredDrinkPlayer = player;
+        _cachedStoredDrinkTankard = tankard;
+        _cachedStoredDrinkFrame = Time.frameCount;
+        _cachedStoredDrinkResult = result;
+        return result;
+    }
+
+    private static bool HasConsumableStoredDrinkUncached(Player player, ItemDrop.ItemData tankard, TankardProfile profile)
+    {
+        if (!tankard.m_customData.TryGetValue(StorageDataKey, out string rawData) || string.IsNullOrWhiteSpace(rawData))
+        {
+            return false;
+        }
+
         Inventory inventory = LoadTankardStorageInventory(player, tankard, profile, out _, out _);
         try
         {
-            return inventory.GetAllItems().Any(item => CanConsumeStoredDrinkQuietly(player, tankard, item));
+            foreach (ItemDrop.ItemData item in inventory.GetAllItems())
+            {
+                if (CanConsumeStoredDrinkQuietly(player, tankard, item))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
         finally
         {
@@ -297,6 +338,8 @@ internal static class TankardStorageSystem
         {
             tankard.m_customData[StorageDataKey] = rawData;
         }
+
+        ClearStoredDrinkCheckCache();
     }
 
     private static Inventory CreateTankardStorageInventory(ItemDrop.ItemData tankard, int width, int height)
@@ -364,7 +407,23 @@ internal static class TankardStorageSystem
 
     private static bool ContainsExactItem(Inventory inventory, ItemDrop.ItemData item)
     {
-        return inventory.GetAllItems().Any(existing => ReferenceEquals(existing, item));
+        foreach (ItemDrop.ItemData existing in inventory.GetAllItems())
+        {
+            if (ReferenceEquals(existing, item))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void ClearStoredDrinkCheckCache()
+    {
+        _cachedStoredDrinkPlayer = null;
+        _cachedStoredDrinkTankard = null;
+        _cachedStoredDrinkFrame = -1;
+        _cachedStoredDrinkResult = false;
     }
 
     private static void NotifyTankardLimitReached()
