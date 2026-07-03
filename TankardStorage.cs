@@ -50,6 +50,57 @@ internal static class TankardStorageSystem
         return itemDrop != null && IsAllowedStoredDrink(inventory, itemDrop.m_itemData);
     }
 
+    internal static bool CanAddTankardToPlayerInventory(Inventory inventory, ItemDrop.ItemData item, Inventory? fromInventory = null)
+    {
+        if (!UsefulTankardsPlugin.EnableMod.Value ||
+            UsefulTankardsPlugin.MaxTankardsInInventory.Value <= 0 ||
+            inventory == null ||
+            item == null ||
+            !TankardTweaks.TryGetProfile(item, out _))
+        {
+            return true;
+        }
+
+        Player player = Player.m_localPlayer;
+        Inventory playerInventory = player != null ? player.GetInventory() : null!;
+        if (playerInventory == null || !ReferenceEquals(inventory, playerInventory))
+        {
+            return true;
+        }
+
+        if (ReferenceEquals(fromInventory, inventory) || ContainsExactItem(inventory, item))
+        {
+            return true;
+        }
+
+        int movingStack = Math.Max(1, item.m_stack);
+        return CountTankards(inventory) + movingStack <= UsefulTankardsPlugin.MaxTankardsInInventory.Value;
+    }
+
+    internal static bool CanAddTankardToPlayerInventory(Inventory inventory, GameObject prefab)
+    {
+        if (!UsefulTankardsPlugin.EnableMod.Value ||
+            UsefulTankardsPlugin.MaxTankardsInInventory.Value <= 0 ||
+            inventory == null ||
+            prefab == null ||
+            (Object)(object)prefab == null ||
+            !TankardTweaks.TryGetProfile(prefab, out _))
+        {
+            return true;
+        }
+
+        Player player = Player.m_localPlayer;
+        Inventory playerInventory = player != null ? player.GetInventory() : null!;
+        if (playerInventory == null || !ReferenceEquals(inventory, playerInventory))
+        {
+            return true;
+        }
+
+        ItemDrop itemDrop = prefab.GetComponent<ItemDrop>();
+        int movingStack = itemDrop != null ? Math.Max(1, itemDrop.m_itemData.m_stack) : 1;
+        return CountTankards(inventory) + movingStack <= UsefulTankardsPlugin.MaxTankardsInInventory.Value;
+    }
+
     internal static bool TrySaveTankardStorageContainer(Container container)
     {
         TankardStorageContainer? storage = container != null ? container.GetComponent<TankardStorageContainer>() : null;
@@ -281,6 +332,25 @@ internal static class TankardStorageSystem
 
         StorageInventories.Remove(inventory);
         InventoryOwners.Remove(inventory);
+    }
+
+    private static int CountTankards(Inventory inventory)
+    {
+        int count = 0;
+        foreach (ItemDrop.ItemData item in inventory.GetAllItems())
+        {
+            if (TankardTweaks.TryGetProfile(item, out _))
+            {
+                count += Math.Max(1, item.m_stack);
+            }
+        }
+
+        return count;
+    }
+
+    private static bool ContainsExactItem(Inventory inventory, ItemDrop.ItemData item)
+    {
+        return inventory.GetAllItems().Any(existing => ReferenceEquals(existing, item));
     }
 
     private static bool IsAllowedStoredDrink(Inventory inventory, ItemDrop.ItemData item)

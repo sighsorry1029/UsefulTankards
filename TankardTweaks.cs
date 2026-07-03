@@ -104,6 +104,18 @@ internal static class TankardTweaks
         return prefabName.Length > 0 && Profiles.TryGetValue(prefabName, out profile);
     }
 
+    internal static bool TryGetProfile(GameObject? prefab, out TankardProfile profile)
+    {
+        profile = null!;
+        if (!UsefulTankardsPlugin.EnableMod.Value || prefab == null || (UnityEngine.Object)(object)prefab == null)
+        {
+            return false;
+        }
+
+        string prefabName = CleanPrefabName(((UnityEngine.Object)prefab).name);
+        return prefabName.Length > 0 && Profiles.TryGetValue(prefabName, out profile);
+    }
+
     internal static void ApplyItemDefinitions()
     {
         if (ObjectDB.instance != null)

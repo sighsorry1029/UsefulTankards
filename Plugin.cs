@@ -20,6 +20,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
     internal static ConfigEntry<bool> MovementWhileDrinking = null!;
     internal static ConfigEntry<bool> TankardStorage = null!;
     internal static ConfigEntry<bool> DrinkStoredMeadsOnUse = null!;
+    internal static ConfigEntry<int> MaxTankardsInInventory = null!;
 
     private readonly Harmony _harmony = new(ModGuid);
 
@@ -31,6 +32,11 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
         MovementWhileDrinking = Config.Bind("01 - General", "Movement While Drinking", true, "Allow movement and rotation while drinking through a tankard.");
         TankardStorage = Config.Bind("01 - General", "Tankard Storage", true, "Allow tankards to store meads in an item-bound inventory opened from the player inventory.");
         DrinkStoredMeadsOnUse = Config.Bind("01 - General", "Drink Stored Meads On Use", true, "When a tankard is used, drink every stored mead that can currently be consumed before falling back to normal inventory meads.");
+        MaxTankardsInInventory = Config.Bind(
+            "01 - General",
+            "Max Tankards In Inventory",
+            3,
+            new ConfigDescription("Maximum total tankards allowed in the player inventory. 0 disables this limit.", new AcceptableValueRange<int>(0, 100)));
 
         EnableMod.SettingChanged += OnConfigChanged;
         MovementWhileDrinking.SettingChanged += OnConfigChanged;

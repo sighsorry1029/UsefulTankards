@@ -123,7 +123,8 @@ internal static class UsefulTankardsInventoryCanAddItemPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
     {
-        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item) &&
+            TankardStorageSystem.CanAddTankardToPlayerInventory(__instance, item))
         {
             return true;
         }
@@ -138,7 +139,8 @@ internal static class UsefulTankardsInventoryCanAddPrefabPatch
 {
     private static bool Prefix(Inventory __instance, GameObject prefab, ref bool __result)
     {
-        if (TankardStorageSystem.CanAddToTankardStorage(__instance, prefab))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, prefab) &&
+            TankardStorageSystem.CanAddTankardToPlayerInventory(__instance, prefab))
         {
             return true;
         }
@@ -153,7 +155,8 @@ internal static class UsefulTankardsInventoryAddItemPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
     {
-        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item) &&
+            TankardStorageSystem.CanAddTankardToPlayerInventory(__instance, item))
         {
             return true;
         }
@@ -168,7 +171,8 @@ internal static class UsefulTankardsInventoryAddPrefabPatch
 {
     private static bool Prefix(Inventory __instance, GameObject prefab, ref bool __result)
     {
-        if (TankardStorageSystem.CanAddToTankardStorage(__instance, prefab))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, prefab) &&
+            TankardStorageSystem.CanAddTankardToPlayerInventory(__instance, prefab))
         {
             return true;
         }
@@ -183,7 +187,8 @@ internal static class UsefulTankardsInventoryAddItemAtPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
     {
-        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item) &&
+            TankardStorageSystem.CanAddTankardToPlayerInventory(__instance, item))
         {
             return true;
         }
@@ -198,7 +203,8 @@ internal static class UsefulTankardsInventoryAddItemAmountPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
     {
-        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item) &&
+            TankardStorageSystem.CanAddTankardToPlayerInventory(__instance, item))
         {
             return true;
         }
@@ -213,7 +219,8 @@ internal static class UsefulTankardsInventoryMoveItemPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item)
     {
-        return TankardStorageSystem.CanAddToTankardStorage(__instance, item);
+        return TankardStorageSystem.CanAddToTankardStorage(__instance, item) &&
+               TankardStorageSystem.CanAddTankardToPlayerInventory(__instance, item);
     }
 }
 
@@ -222,7 +229,8 @@ internal static class UsefulTankardsInventoryMoveItemAmountPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
     {
-        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item) &&
+            TankardStorageSystem.CanAddTankardToPlayerInventory(__instance, item))
         {
             return true;
         }
