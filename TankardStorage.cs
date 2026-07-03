@@ -377,7 +377,7 @@ internal static class TankardStorageSystem
         _nextLimitMessageTime = Time.unscaledTime + LimitMessageInterval;
         string template = TankardLocalization.Localize(TankardLocalization.TankardLimitReachedKey);
         string message = string.Format(template, UsefulTankardsPlugin.MaxTankardsInInventory.Value);
-        MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, message);
+        MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, message);
     }
 
     private static bool IsAllowedStoredDrink(Inventory inventory, ItemDrop.ItemData item)
