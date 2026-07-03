@@ -34,10 +34,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
     internal static ConfigEntry<float> MovementWhileDrinking = null!;
     internal static ConfigEntry<int> MaxTankardsInInventory = null!;
 
-    internal static bool ModEnabled => true;
     internal static float MovementWhileDrinkingMultiplier => Math.Min(1f, Math.Max(0f, MovementWhileDrinking.Value));
-    internal static bool TankardStorageEnabled => true;
-    internal static bool DrinkStoredMeadsOnUseEnabled => true;
 
     private readonly Harmony _harmony = new(ModGuid);
     private static bool _roundingMovementWhileDrinking;
@@ -100,11 +97,6 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
             storageSlots: 5);
 
         _harmony.PatchAll();
-    }
-
-    private static void OnConfigChanged(object sender, EventArgs args)
-    {
-        TankardTweaks.ApplyItemDefinitions();
     }
 
     private static void OnMovementWhileDrinkingChanged(object sender, EventArgs args)

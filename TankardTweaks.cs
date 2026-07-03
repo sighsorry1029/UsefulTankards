@@ -103,7 +103,7 @@ internal static class TankardTweaks
     internal static bool TryGetProfile(ItemDrop.ItemData? item, out TankardProfile profile)
     {
         profile = null!;
-        if (!UsefulTankardsPlugin.ModEnabled || item == null)
+        if (item == null)
         {
             return false;
         }
@@ -115,7 +115,7 @@ internal static class TankardTweaks
     internal static bool TryGetProfile(GameObject? prefab, out TankardProfile profile)
     {
         profile = null!;
-        if (!UsefulTankardsPlugin.ModEnabled || prefab == null || (UnityEngine.Object)(object)prefab == null)
+        if (prefab == null || (UnityEngine.Object)(object)prefab == null)
         {
             return false;
         }
@@ -148,7 +148,7 @@ internal static class TankardTweaks
     internal static void ModifyEffectForCurrentTankard(StatusEffect effect)
     {
         TankardProfile? profile = CurrentUseContext;
-        if (!UsefulTankardsPlugin.ModEnabled || profile == null || effect.m_ttl <= 0f)
+        if (profile == null || effect.m_ttl <= 0f)
         {
             return;
         }
@@ -167,7 +167,7 @@ internal static class TankardTweaks
         }
 
         List<string> lines = new();
-        if (UsefulTankardsPlugin.TankardStorageEnabled && profile.TankardStorageSlots > 0)
+        if (profile.TankardStorageSlots > 0)
         {
             lines.Add(TankardLocalization.Localize(TankardLocalization.OpenHintKey));
         }
@@ -221,7 +221,7 @@ internal static class TankardTweaks
             DurabilityBaselines[prefabName] = DurabilityBaseline.From(shared);
         }
 
-        if (!UsefulTankardsPlugin.ModEnabled || profile.DurabilityUses <= 0)
+        if (profile.DurabilityUses <= 0)
         {
             DurabilityBaselines[prefabName].Restore(shared);
             return;
