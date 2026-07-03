@@ -10,10 +10,12 @@ internal static class TankardLocalization
     internal const string OpenHintKey = "$ut_tankard_open_hint";
     internal const string CooldownReductionKey = "$ut_tankard_cooldown_reduction";
     internal const string BuffDurationBonusKey = "$ut_tankard_buff_duration_bonus";
+    internal const string TankardLimitReachedKey = "$ut_tankard_limit_reached";
 
     private const string OpenHintWord = "ut_tankard_open_hint";
     private const string CooldownReductionWord = "ut_tankard_cooldown_reduction";
     private const string BuffDurationBonusWord = "ut_tankard_buff_duration_bonus";
+    private const string TankardLimitReachedWord = "ut_tankard_limit_reached";
     private const string EnglishLanguage = "english";
     private static readonly MethodInfo? AddWordMethod = AccessTools.Method(typeof(Localization), "AddWord", new[] { typeof(string), typeof(string) });
 
@@ -35,6 +37,12 @@ internal static class TankardLocalization
         ["korean"] = "버프 지속시간 증가: {0}%",
     };
 
+    private static readonly Dictionary<string, string> TankardLimitReachedByLanguage = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["english"] = "You can carry up to {0} tankards.",
+        ["korean"] = "탱커드는 최대 {0}개까지 지닐 수 있습니다.",
+    };
+
     internal static void Register()
     {
         if (Localization.instance != null)
@@ -54,6 +62,7 @@ internal static class TankardLocalization
         AddWord(localization, OpenHintWord, Get(OpenHintByLanguage, languageName));
         AddWord(localization, CooldownReductionWord, Get(CooldownReductionByLanguage, languageName));
         AddWord(localization, BuffDurationBonusWord, Get(BuffDurationBonusByLanguage, languageName));
+        AddWord(localization, TankardLimitReachedWord, Get(TankardLimitReachedByLanguage, languageName));
     }
 
     internal static string Localize(string key)

@@ -10,9 +10,11 @@ internal static class TankardStorageSystem
 {
     private const string StorageDataKey = "UsefulTankards.Storage.Data";
     private const string StorageSlotsKey = "UsefulTankards.Storage.Slots";
+    private const float LimitMessageInterval = 1.5f;
 
     private static readonly HashSet<Inventory> StorageInventories = new();
     private static readonly Dictionary<Inventory, ItemDrop.ItemData> InventoryOwners = new();
+    private static float _nextLimitMessageTime;
 
     internal static bool IsTankardStorageInventory(Inventory inventory)
     {
@@ -74,7 +76,13 @@ internal static class TankardStorageSystem
         }
 
         int movingStack = Math.Max(1, item.m_stack);
-        return CountTankards(inventory) + movingStack <= UsefulTankardsPlugin.MaxTankardsInInventory.Value;
+        if (CountTankards(inventory) + movingStack <= UsefulTankardsPlugin.MaxTankardsInInventory.Value)
+        {
+            return true;
+        }
+
+        NotifyTankardLimitReached();
+        return false;
     }
 
     internal static bool CanAddTankardToPlayerInventory(Inventory inventory, GameObject prefab)
@@ -98,7 +106,13 @@ internal static class TankardStorageSystem
 
         ItemDrop itemDrop = prefab.GetComponent<ItemDrop>();
         int movingStack = itemDrop != null ? Math.Max(1, itemDrop.m_itemData.m_stack) : 1;
-        return CountTankards(inventory) + movingStack <= UsefulTankardsPlugin.MaxTankardsInInventory.Value;
+        if (CountTankards(inventory) + movingStack <= UsefulTankardsPlugin.MaxTankardsInInventory.Value)
+        {
+            return true;
+        }
+
+        NotifyTankardLimitReached();
+        return false;
     }
 
     internal static bool TrySaveTankardStorageContainer(Container container)
@@ -351,6 +365,19 @@ internal static class TankardStorageSystem
     private static bool ContainsExactItem(Inventory inventory, ItemDrop.ItemData item)
     {
         return inventory.GetAllItems().Any(existing => ReferenceEquals(existing, item));
+    }
+
+    private static void NotifyTankardLimitReached()
+    {
+        if (MessageHud.instance == null || Time.unscaledTime < _nextLimitMessageTime)
+        {
+            return;
+        }
+
+        _nextLimitMessageTime = Time.unscaledTime + LimitMessageInterval;
+        string template = TankardLocalization.Localize(TankardLocalization.TankardLimitReachedKey);
+        string message = string.Format(template, UsefulTankardsPlugin.MaxTankardsInInventory.Value);
+        MessageHud.instance.ShowMessage(MessageHud.MessageType.TopLeft, message);
     }
 
     private static bool IsAllowedStoredDrink(Inventory inventory, ItemDrop.ItemData item)
