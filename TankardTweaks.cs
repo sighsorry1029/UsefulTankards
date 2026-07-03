@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using BepInEx.Configuration;
 using UnityEngine;
 
@@ -31,6 +33,8 @@ internal sealed class TankardProfile
     internal int TankardStorageSlots => Math.Max(0, StorageSlots.Value);
     internal float CooldownReductionMultiplier => Math.Max(0f, 1f - Clamp(CooldownReduction.Value, 0f, 0.95f));
     internal float DurationBonusMultiplier => 1f + Math.Max(0f, DurationBonus.Value);
+    internal float CooldownReductionPercent => Clamp(CooldownReduction.Value, 0f, 0.95f) * 100f;
+    internal float DurationBonusPercent => Math.Max(0f, DurationBonus.Value) * 100f;
 
     private static float Clamp(float value, float min, float max)
     {
@@ -149,6 +153,42 @@ internal static class TankardTweaks
             ? profile.CooldownReductionMultiplier
             : profile.DurationBonusMultiplier;
         effect.m_ttl *= multiplier;
+    }
+
+    internal static void AppendTankardTooltip(ItemDrop.ItemData item, ref string tooltip)
+    {
+        if (!TryGetProfile(item, out TankardProfile profile))
+        {
+            return;
+        }
+
+        List<string> lines = new();
+        if (UsefulTankardsPlugin.TankardStorage.Value && profile.TankardStorageSlots > 0)
+        {
+            lines.Add(TankardLocalization.Localize(TankardLocalization.OpenHintKey));
+        }
+
+        if (profile.CooldownReductionPercent > 0f)
+        {
+            lines.Add(FormatTooltip(TankardLocalization.CooldownReductionKey, profile.CooldownReductionPercent));
+        }
+
+        if (profile.DurationBonusPercent > 0f)
+        {
+            lines.Add(FormatTooltip(TankardLocalization.BuffDurationBonusKey, profile.DurationBonusPercent));
+        }
+
+        if (lines.Count > 0)
+        {
+            tooltip += "\n\n<color=orange>" + string.Join("\n", lines.Where(line => !string.IsNullOrWhiteSpace(line))) + "</color>";
+        }
+    }
+
+    private static string FormatTooltip(string key, float percentage)
+    {
+        string template = TankardLocalization.Localize(key);
+        string value = percentage.ToString("0.#", CultureInfo.InvariantCulture);
+        return string.Format(CultureInfo.InvariantCulture, template, value);
     }
 
     private static void ApplyItemDefinition(GameObject? prefab)

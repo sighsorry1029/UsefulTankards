@@ -43,6 +43,8 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
         TankardStorage.SettingChanged += OnConfigChanged;
         DrinkStoredMeadsOnUse.SettingChanged += OnConfigChanged;
 
+        TankardLocalization.Register();
+
         TankardTweaks.RegisterProfile(
             Config,
             "02 - Tankard",

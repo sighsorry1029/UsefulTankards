@@ -101,3 +101,12 @@ internal static class UsefulTankardsStatusEffectSetupPatch
         TankardTweaks.ModifyEffectForCurrentTankard(__instance);
     }
 }
+
+[HarmonyPatch(typeof(ItemDrop.ItemData), nameof(ItemDrop.ItemData.GetTooltip), new[] { typeof(ItemDrop.ItemData), typeof(int), typeof(bool), typeof(float), typeof(int) })]
+internal static class UsefulTankardsItemTooltipPatch
+{
+    private static void Postfix(ItemDrop.ItemData item, ref string __result)
+    {
+        TankardTweaks.AppendTankardTooltip(item, ref __result);
+    }
+}
