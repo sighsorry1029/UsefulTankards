@@ -26,11 +26,12 @@ internal static class UsefulTankardsAttackMovementSpeedPatch
 {
     private static void Postfix(Humanoid __instance, ref float __result)
     {
-        if (UsefulTankardsPlugin.MovementWhileDrinkingMultiplier > 0f
+        float multiplier = UsefulTankardsPlugin.MovementWhileDrinkingMultiplier;
+        if (multiplier > 0f
             && __instance.InAttack()
             && TankardTweaks.TryGetProfile(__instance.GetCurrentWeapon(), out _))
         {
-            __result = Mathf.Max(__result, UsefulTankardsPlugin.MovementWhileDrinkingMultiplier);
+            __result = Mathf.Max(__result, multiplier);
         }
     }
 }
@@ -40,12 +41,24 @@ internal static class UsefulTankardsAttackRotationSpeedPatch
 {
     private static void Postfix(Humanoid __instance, ref float __result)
     {
-        if (UsefulTankardsPlugin.MovementWhileDrinkingMultiplier > 0f
+        float multiplier = UsefulTankardsPlugin.MovementWhileDrinkingMultiplier;
+        if (multiplier > 0f
             && __instance.InAttack()
             && TankardTweaks.TryGetProfile(__instance.GetCurrentWeapon(), out _))
         {
-            __result = Mathf.Max(__result, UsefulTankardsPlugin.MovementWhileDrinkingMultiplier);
+            __result = Mathf.Max(__result, multiplier);
         }
+    }
+}
+
+internal static class UsefulTankardsAttackAmmo
+{
+    internal static bool HasStoredDrink(Humanoid character, ItemDrop.ItemData weapon, out TankardProfile profile)
+    {
+        profile = null!;
+        return TankardTweaks.TryGetProfile(weapon, out profile) &&
+               character is Player player &&
+               TankardStorageSystem.HasConsumableStoredDrink(player, weapon, profile);
     }
 }
 
@@ -80,9 +93,7 @@ internal static class UsefulTankardsEquipAmmoItemPatch
 {
     private static bool Prefix(Humanoid character, ItemDrop.ItemData weapon, ref bool __result)
     {
-        if (TankardTweaks.TryGetProfile(weapon, out TankardProfile profile) &&
-            character is Player player &&
-            TankardStorageSystem.HasConsumableStoredDrink(player, weapon, profile))
+        if (UsefulTankardsAttackAmmo.HasStoredDrink(character, weapon, out _))
         {
             __result = true;
             return false;
@@ -97,9 +108,7 @@ internal static class UsefulTankardsHaveAmmoPatch
 {
     private static bool Prefix(Humanoid character, ItemDrop.ItemData weapon, ref bool __result)
     {
-        if (!TankardTweaks.TryGetProfile(weapon, out TankardProfile profile) ||
-            character is not Player player ||
-            !TankardStorageSystem.HasConsumableStoredDrink(player, weapon, profile))
+        if (!UsefulTankardsAttackAmmo.HasStoredDrink(character, weapon, out _))
         {
             return true;
         }
