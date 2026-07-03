@@ -37,7 +37,7 @@ internal static class UsefulTankardsContainerSetInUsePatch
             return true;
         }
 
-        __instance.m_inUse = inUse;
+        ValheimAccess.SetContainerInUse(__instance, inUse);
         return false;
     }
 }
@@ -52,7 +52,7 @@ internal static class UsefulTankardsContainerIsInUsePatch
             return true;
         }
 
-        __result = __instance.m_inUse;
+        __result = ValheimAccess.GetContainerInUse(__instance);
         return false;
     }
 }
@@ -95,7 +95,7 @@ internal static class UsefulTankardsInventoryGuiCloseContainerPatch
 {
     private static void Prefix(InventoryGui __instance, out Container __state)
     {
-        __state = __instance.m_currentContainer;
+        __state = ValheimAccess.GetCurrentContainer(__instance)!;
     }
 
     private static void Postfix(Container __state)
@@ -109,7 +109,7 @@ internal static class UsefulTankardsInventoryGuiHidePatch
 {
     private static void Prefix(InventoryGui __instance, out Container __state)
     {
-        __state = __instance.m_currentContainer;
+        __state = ValheimAccess.GetCurrentContainer(__instance)!;
     }
 
     private static void Postfix(Container __state)

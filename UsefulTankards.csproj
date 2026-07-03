@@ -92,6 +92,7 @@
     <Compile Include="Plugin.cs" />
     <Compile Include="TankardTweaks.cs" />
     <Compile Include="TankardStorage.cs" />
+    <Compile Include="ValheimAccess.cs" />
     <Compile Include="Patches.cs" />
     <Compile Include="StoragePatches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

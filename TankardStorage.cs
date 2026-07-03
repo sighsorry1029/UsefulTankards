@@ -19,7 +19,7 @@ internal static class TankardStorageSystem
         return inventory != null && StorageInventories.Contains(inventory);
     }
 
-    internal static bool IsTankardStorageContainer(Container container)
+    internal static bool IsTankardStorageContainer(Container? container)
     {
         return container != null && container.GetComponent<TankardStorageContainer>() != null;
     }
@@ -72,7 +72,8 @@ internal static class TankardStorageSystem
             return false;
         }
 
-        if (IsTankardStorageContainer(inventoryGui.m_currentContainer))
+        Container? currentContainer = ValheimAccess.GetCurrentContainer(inventoryGui);
+        if (IsTankardStorageContainer(currentContainer))
         {
             if (!ZInput.GetButtonDown("Use"))
             {
@@ -84,12 +85,15 @@ internal static class TankardStorageSystem
             return true;
         }
 
-        if (inventoryGui.m_currentContainer != null || !ZInput.GetButtonDown("Use"))
+        if (currentContainer != null || !ZInput.GetButtonDown("Use"))
         {
             return false;
         }
 
-        ItemDrop.ItemData hoveredItem = inventoryGui.m_playerGrid.GetItem(new Vector2i(Mathf.RoundToInt(Input.mousePosition.x), Mathf.RoundToInt(Input.mousePosition.y)));
+        InventoryGrid? playerGrid = ValheimAccess.GetPlayerGrid(inventoryGui);
+        ItemDrop.ItemData hoveredItem = playerGrid != null
+            ? playerGrid.GetItem(new Vector2i(Mathf.RoundToInt(Input.mousePosition.x), Mathf.RoundToInt(Input.mousePosition.y)))
+            : null!;
         if (!TankardTweaks.TryGetProfile(hoveredItem, out TankardProfile profile) || profile.TankardStorageSlots <= 0)
         {
             return false;
@@ -325,12 +329,7 @@ internal static class TankardStorageSystem
             _container = container;
             _inventory = LoadTankardStorageInventory(player, tankard, profile, out width, out height);
 
-            _inventory.m_onChanged += Save;
-            container.m_name = tankard.m_shared.m_name;
-            container.m_width = width;
-            container.m_height = height;
-            container.m_inventory = _inventory;
-            container.m_inUse = true;
+            ValheimAccess.SetContainerFields(container, tankard.m_shared.m_name, width, height, _inventory, inUse: true);
             tankard.m_customData[StorageSlotsKey] = slots.ToString();
             Save();
         }
@@ -340,7 +339,7 @@ internal static class TankardStorageSystem
             if (!_closed &&
                 _container != null &&
                 InventoryGui.instance != null &&
-                InventoryGui.instance.m_currentContainer != _container)
+                ValheimAccess.GetCurrentContainer(InventoryGui.instance) != _container)
             {
                 CloseAndDestroy();
                 return;
@@ -373,7 +372,6 @@ internal static class TankardStorageSystem
             Save();
             if (_inventory != null)
             {
-                _inventory.m_onChanged -= Save;
                 UnregisterTankardStorageInventory(_inventory);
             }
 
