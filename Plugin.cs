@@ -18,6 +18,8 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
 
     internal static ConfigEntry<bool> EnableMod = null!;
     internal static ConfigEntry<bool> MovementWhileDrinking = null!;
+    internal static ConfigEntry<bool> TankardStorage = null!;
+    internal static ConfigEntry<bool> DrinkStoredMeadsOnUse = null!;
 
     private readonly Harmony _harmony = new(ModGuid);
 
@@ -27,9 +29,13 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
 
         EnableMod = Config.Bind("01 - General", "Enable", true, "Enable UsefulTankards tweaks.");
         MovementWhileDrinking = Config.Bind("01 - General", "Movement While Drinking", true, "Allow movement and rotation while drinking through a tankard.");
+        TankardStorage = Config.Bind("01 - General", "Tankard Storage", true, "Allow tankards to store meads in an item-bound inventory opened from the player inventory.");
+        DrinkStoredMeadsOnUse = Config.Bind("01 - General", "Drink Stored Meads On Use", true, "When a tankard is used, drink every stored mead that can currently be consumed before falling back to normal inventory meads.");
 
         EnableMod.SettingChanged += OnConfigChanged;
         MovementWhileDrinking.SettingChanged += OnConfigChanged;
+        TankardStorage.SettingChanged += OnConfigChanged;
+        DrinkStoredMeadsOnUse.SettingChanged += OnConfigChanged;
 
         TankardTweaks.RegisterProfile(
             Config,
@@ -37,21 +43,24 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
             "Tankard",
             durability: 10,
             cooldownReduction: 0.10f,
-            durationBonus: 0.10f);
+            durationBonus: 0.10f,
+            storageSlots: 3);
         TankardTweaks.RegisterProfile(
             Config,
             "03 - Anniversary Tankard",
             "TankardAnniversary",
             durability: 15,
             cooldownReduction: 0.20f,
-            durationBonus: 0.20f);
+            durationBonus: 0.20f,
+            storageSlots: 4);
         TankardTweaks.RegisterProfile(
             Config,
             "04 - Dvergr Tankard",
             "Tankard_dvergr",
             durability: 20,
             cooldownReduction: 0.30f,
-            durationBonus: 0.30f);
+            durationBonus: 0.30f,
+            storageSlots: 5);
 
         _harmony.PatchAll();
     }

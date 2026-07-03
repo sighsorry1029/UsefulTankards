@@ -53,6 +53,10 @@
       <HintPath>$(BepInExPath)\core\0Harmony.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="assembly_guiutils">
+      <HintPath>$(PublicizedAssembliesPath)\assembly_guiutils_publicized.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="assembly_utils">
       <HintPath>$(PublicizedAssembliesPath)\assembly_utils_publicized.dll</HintPath>
       <Private>False</Private>
@@ -79,11 +83,17 @@
       <HintPath>$(CorlibPath)\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(CorlibPath)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Plugin.cs" />
     <Compile Include="TankardTweaks.cs" />
+    <Compile Include="TankardStorage.cs" />
     <Compile Include="Patches.cs" />
+    <Compile Include="StoragePatches.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

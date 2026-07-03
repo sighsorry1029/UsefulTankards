@@ -11,20 +11,24 @@ internal sealed class TankardProfile
         string prefabName,
         ConfigEntry<int> durability,
         ConfigEntry<float> cooldownReduction,
-        ConfigEntry<float> durationBonus)
+        ConfigEntry<float> durationBonus,
+        ConfigEntry<int> storageSlots)
     {
         PrefabName = prefabName;
         Durability = durability;
         CooldownReduction = cooldownReduction;
         DurationBonus = durationBonus;
+        StorageSlots = storageSlots;
     }
 
     internal string PrefabName { get; }
     internal ConfigEntry<int> Durability { get; }
     internal ConfigEntry<float> CooldownReduction { get; }
     internal ConfigEntry<float> DurationBonus { get; }
+    internal ConfigEntry<int> StorageSlots { get; }
 
     internal int DurabilityUses => Math.Max(0, Durability.Value);
+    internal int TankardStorageSlots => Math.Max(0, StorageSlots.Value);
     internal float CooldownReductionMultiplier => Math.Max(0f, 1f - Clamp(CooldownReduction.Value, 0f, 0.95f));
     internal float DurationBonusMultiplier => 1f + Math.Max(0f, DurationBonus.Value);
 
@@ -59,7 +63,8 @@ internal static class TankardTweaks
         string prefabName,
         int durability,
         float cooldownReduction,
-        float durationBonus)
+        float durationBonus,
+        int storageSlots)
     {
         TankardProfile profile = new TankardProfile(
             prefabName,
@@ -77,7 +82,12 @@ internal static class TankardTweaks
                 section,
                 "Buff Duration Bonus",
                 durationBonus,
-                new ConfigDescription("Duration bonus for non-over-time buffs drunk through this tankard. 0.10 means +10%.", new AcceptableValueRange<float>(0f, 10f))));
+                new ConfigDescription("Duration bonus for non-over-time buffs drunk through this tankard. 0.10 means +10%.", new AcceptableValueRange<float>(0f, 10f))),
+            config.Bind(
+                section,
+                "Storage Slots",
+                storageSlots,
+                new ConfigDescription("Number of mead storage slots in this tankard. 0 disables storage for this tankard.", new AcceptableValueRange<int>(0, 20))));
         profile.Durability.SettingChanged += (_, _) => ApplyItemDefinitions();
         Profiles[prefabName] = profile;
     }
@@ -238,6 +248,11 @@ internal static class TankardTweaks
         return (UnityEngine.Object)(object)item.m_dropPrefab != null
             ? CleanPrefabName(((UnityEngine.Object)item.m_dropPrefab).name)
             : "";
+    }
+
+    internal static string GetCleanPrefabName(ItemDrop.ItemData item)
+    {
+        return GetPrefabName(item);
     }
 
     private static string CleanPrefabName(string name)
