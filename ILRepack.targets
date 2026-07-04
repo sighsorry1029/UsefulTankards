@@ -9,6 +9,7 @@
       <RepackReferenceFiles Include="$(PublicizedAssembliesPath)\assembly_guiutils_publicized.dll" />
       <RepackReferenceFiles Include="$(CorlibPath)\netstandard.dll" />
       <RepackReferenceFiles Include="$(CorlibPath)\UnityEngine.dll" />
+      <RepackReferenceFiles Include="$(CorlibPath)\UnityEngine.AnimationModule.dll" />
       <RepackReferenceFiles Include="$(CorlibPath)\UnityEngine.CoreModule.dll" />
       <RepackReferenceFiles Include="$(CorlibPath)\UnityEngine.InputLegacyModule.dll" />
       <InputAssemblies Include="$(TargetPath)" />
@@ -27,6 +28,6 @@
       OutputFile="$(TargetPath)"
       TargetKind="SameAsPrimaryAssembly"
       LibraryPath="@(RepackLibraryPath)" />
-    <Delete Files="$(TargetDir)BepInEx.dll;$(TargetDir)0Harmony.dll;$(TargetDir)assembly_valheim_publicized.dll;$(TargetDir)assembly_utils_publicized.dll;$(TargetDir)assembly_guiutils_publicized.dll;$(TargetDir)netstandard.dll;$(TargetDir)UnityEngine.dll;$(TargetDir)UnityEngine.CoreModule.dll;$(TargetDir)UnityEngine.InputLegacyModule.dll" />
+    <Delete Files="$(TargetDir)BepInEx.dll;$(TargetDir)0Harmony.dll;$(TargetDir)assembly_valheim_publicized.dll;$(TargetDir)assembly_utils_publicized.dll;$(TargetDir)assembly_guiutils_publicized.dll;$(TargetDir)netstandard.dll;$(TargetDir)UnityEngine.dll;$(TargetDir)UnityEngine.AnimationModule.dll;$(TargetDir)UnityEngine.CoreModule.dll;$(TargetDir)UnityEngine.InputLegacyModule.dll" />
   </Target>
 </Project>

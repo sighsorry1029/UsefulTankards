@@ -9,11 +9,10 @@ internal static class TankardStorageSystem
 {
     private const string StorageDataKey = "UsefulTankards.Storage.Data";
     private const string StorageSlotsKey = "UsefulTankards.Storage.Slots";
-    private const float LimitMessageInterval = 1.5f;
 
     private static readonly HashSet<Inventory> StorageInventories = new();
     private static readonly Dictionary<Inventory, ItemDrop.ItemData> InventoryOwners = new();
-    private static float _nextLimitMessageTime;
+    private static readonly HashSet<string> WarnedIncompleteLoads = new(StringComparer.Ordinal);
     private static Player? _cachedStoredDrinkPlayer;
     private static ItemDrop.ItemData? _cachedStoredDrinkTankard;
     private static int _cachedStoredDrinkFrame = -1;
@@ -55,67 +54,6 @@ internal static class TankardStorageSystem
         return itemDrop != null && IsAllowedStoredDrink(inventory, itemDrop.m_itemData);
     }
 
-    internal static bool CanAddTankardToPlayerInventory(Inventory inventory, ItemDrop.ItemData item, Inventory? fromInventory = null)
-    {
-        if (UsefulTankardsPlugin.MaxTankardsInInventory.Value <= 0 ||
-            inventory == null ||
-            item == null ||
-            !TankardTweaks.TryGetProfile(item, out _))
-        {
-            return true;
-        }
-
-        Player player = Player.m_localPlayer;
-        Inventory playerInventory = player != null ? player.GetInventory() : null!;
-        if (playerInventory == null || !ReferenceEquals(inventory, playerInventory))
-        {
-            return true;
-        }
-
-        if (ReferenceEquals(fromInventory, inventory) || ContainsExactItem(inventory, item))
-        {
-            return true;
-        }
-
-        int movingStack = Math.Max(1, item.m_stack);
-        if (CountTankards(inventory) + movingStack <= UsefulTankardsPlugin.MaxTankardsInInventory.Value)
-        {
-            return true;
-        }
-
-        NotifyTankardLimitReached();
-        return false;
-    }
-
-    internal static bool CanAddTankardToPlayerInventory(Inventory inventory, GameObject prefab)
-    {
-        if (UsefulTankardsPlugin.MaxTankardsInInventory.Value <= 0 ||
-            inventory == null ||
-            prefab == null ||
-            (Object)(object)prefab == null ||
-            !TankardTweaks.TryGetProfile(prefab, out _))
-        {
-            return true;
-        }
-
-        Player player = Player.m_localPlayer;
-        Inventory playerInventory = player != null ? player.GetInventory() : null!;
-        if (playerInventory == null || !ReferenceEquals(inventory, playerInventory))
-        {
-            return true;
-        }
-
-        ItemDrop itemDrop = prefab.GetComponent<ItemDrop>();
-        int movingStack = itemDrop != null ? Math.Max(1, itemDrop.m_itemData.m_stack) : 1;
-        if (CountTankards(inventory) + movingStack <= UsefulTankardsPlugin.MaxTankardsInInventory.Value)
-        {
-            return true;
-        }
-
-        NotifyTankardLimitReached();
-        return false;
-    }
-
     internal static bool TrySaveTankardStorageContainer(Container container)
     {
         TankardStorageContainer? storage = container != null ? container.GetComponent<TankardStorageContainer>() : null;
@@ -126,6 +64,60 @@ internal static class TankardStorageSystem
 
         storage.Save();
         return true;
+    }
+
+    internal static float GetStoredDrinkWeight(ItemDrop.ItemData tankard)
+    {
+        if (!TryLoadStoredInventorySnapshot(tankard, out Inventory inventory))
+        {
+            return 0f;
+        }
+
+        float weight = 0f;
+        foreach (ItemDrop.ItemData item in inventory.GetAllItems())
+        {
+            weight += item.GetWeight();
+        }
+
+        return weight;
+    }
+
+    internal static List<string> GetStoredDrinkTooltipLines(ItemDrop.ItemData tankard)
+    {
+        List<string> lines = new();
+        if (!TryLoadStoredInventorySnapshot(tankard, out Inventory inventory))
+        {
+            return lines;
+        }
+
+        Dictionary<string, StoredDrinkSummary> summaries = new(StringComparer.Ordinal);
+        foreach (ItemDrop.ItemData item in inventory.GetAllItems())
+        {
+            if (item == null)
+            {
+                continue;
+            }
+
+            string name = LocalizeItemName(item);
+            int stack = Math.Max(1, item.m_stack);
+            int capacity = Math.Max(stack, item.m_shared?.m_maxStackSize ?? stack);
+            if (!summaries.TryGetValue(name, out StoredDrinkSummary summary))
+            {
+                summaries[name] = new StoredDrinkSummary(name, stack, capacity);
+                continue;
+            }
+
+            summary.Stack += stack;
+            summary.Capacity += capacity;
+        }
+
+        foreach (StoredDrinkSummary summary in summaries.Values)
+        {
+            string amount = summary.Capacity > 1 ? $" {summary.Stack}/{summary.Capacity}" : "";
+            lines.Add($"- {summary.Name}{amount}");
+        }
+
+        return lines;
     }
 
     internal static bool TryHandleInventoryGuiUseInput(InventoryGui inventoryGui)
@@ -188,7 +180,12 @@ internal static class TankardStorageSystem
             return false;
         }
 
-        Inventory inventory = LoadTankardStorageInventory(player, tankard, profile, out _, out _);
+        Inventory inventory = LoadTankardStorageInventory(player, tankard, profile, out _, out _, out bool loadComplete);
+        if (!loadComplete)
+        {
+            return false;
+        }
+
         try
         {
             bool consumedAny = false;
@@ -258,7 +255,12 @@ internal static class TankardStorageSystem
             return false;
         }
 
-        Inventory inventory = LoadTankardStorageInventory(player, tankard, profile, out _, out _);
+        Inventory inventory = LoadTankardStorageInventory(player, tankard, profile, out _, out _, out bool loadComplete);
+        if (!loadComplete)
+        {
+            return false;
+        }
+
         try
         {
             foreach (ItemDrop.ItemData item in inventory.GetAllItems())
@@ -286,28 +288,70 @@ internal static class TankardStorageSystem
         TankardStorageContainer storage = storageObject.AddComponent<TankardStorageContainer>();
         Container container = storageObject.AddComponent<Container>();
         storage.Initialize(player, tankard, profile, container, slots, width, height);
+        if (!storage.LoadComplete)
+        {
+            storage.CloseAndDestroy();
+            return;
+        }
+
         InventoryGui.instance.Show(container, 1);
     }
 
-    private static Inventory LoadTankardStorageInventory(Player player, ItemDrop.ItemData tankard, TankardProfile profile, out int width, out int height)
+    private static Inventory LoadTankardStorageInventory(Player player, ItemDrop.ItemData tankard, TankardProfile profile, out int width, out int height, out bool loadComplete)
     {
         int slots = ResolveStorageSlots(tankard, profile);
         ResolveGridSize(slots, out width, out height);
         Inventory inventory = CreateTankardStorageInventory(tankard, width, height);
+        loadComplete = true;
         if (tankard.m_customData.TryGetValue(StorageDataKey, out string rawData) && !string.IsNullOrWhiteSpace(rawData))
         {
             try
             {
                 inventory.Load(new ZPackage(rawData));
+                loadComplete = IsStorageLoadComplete(tankard, rawData, inventory);
             }
             catch (Exception exception)
             {
                 UsefulTankardsPlugin.Log.LogWarning($"Could not read tankard storage for {TankardTweaks.GetCleanPrefabName(tankard)}: {exception.GetBaseException().Message}");
+                loadComplete = false;
             }
         }
 
         RegisterTankardStorageInventory(inventory, tankard);
         return inventory;
+    }
+
+    private static bool TryLoadStoredInventorySnapshot(ItemDrop.ItemData tankard, out Inventory inventory)
+    {
+        inventory = null!;
+        if (tankard == null ||
+            !TankardTweaks.TryGetProfile(tankard, out TankardProfile profile) ||
+            !tankard.m_customData.TryGetValue(StorageDataKey, out string rawData) ||
+            string.IsNullOrWhiteSpace(rawData))
+        {
+            return false;
+        }
+
+        int slots = ResolveStorageSlots(tankard, profile);
+        ResolveGridSize(slots, out int width, out int height);
+        inventory = CreateTankardStorageInventory(tankard, width, height);
+        try
+        {
+            inventory.Load(new ZPackage(rawData));
+            if (!IsStorageLoadComplete(tankard, rawData, inventory))
+            {
+                inventory = null!;
+                return false;
+            }
+
+            return inventory.GetAllItems().Count > 0;
+        }
+        catch (Exception exception)
+        {
+            UsefulTankardsPlugin.Log.LogWarning($"Could not read tankard storage for {TankardTweaks.GetCleanPrefabName(tankard)}: {exception.GetBaseException().Message}");
+            inventory = null!;
+            return false;
+        }
     }
 
     private static void SaveTankardStorageInventory(ItemDrop.ItemData tankard, Inventory inventory)
@@ -336,6 +380,92 @@ internal static class TankardStorageSystem
     {
         string name = tankard?.m_shared?.m_name ?? "$item_tankard";
         return new Inventory(name, tankard?.GetIcon(), width, height);
+    }
+
+    private static bool IsStorageLoadComplete(ItemDrop.ItemData tankard, string rawData, Inventory inventory)
+    {
+        if (!TryReadExpectedStorageStack(rawData, out int expectedEntries, out int expectedStack) || expectedEntries <= 0)
+        {
+            return true;
+        }
+
+        int actualStack = 0;
+        foreach (ItemDrop.ItemData item in inventory.GetAllItems())
+        {
+            actualStack += Math.Max(0, item.m_stack);
+        }
+
+        if (actualStack >= expectedStack)
+        {
+            return true;
+        }
+
+        WarnIncompleteLoad(tankard, expectedStack, actualStack);
+        return false;
+    }
+
+    private static bool TryReadExpectedStorageStack(string rawData, out int expectedEntries, out int expectedStack)
+    {
+        expectedEntries = 0;
+        expectedStack = 0;
+        try
+        {
+            ZPackage package = new(rawData);
+            int version = package.ReadInt();
+            int itemCount = package.ReadInt();
+            if (version != 106)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < itemCount; ++i)
+            {
+                string prefabName = package.ReadString();
+                int stack = package.ReadInt();
+                _ = package.ReadSingle();
+                _ = package.ReadVector2i();
+                _ = package.ReadBool();
+                _ = package.ReadInt();
+                _ = package.ReadInt();
+                _ = package.ReadLong();
+                _ = package.ReadString();
+                int customDataCount = package.ReadInt();
+                for (int j = 0; j < customDataCount; ++j)
+                {
+                    _ = package.ReadString();
+                    _ = package.ReadString();
+                }
+
+                _ = package.ReadInt();
+                _ = package.ReadBool();
+                if (string.IsNullOrWhiteSpace(prefabName))
+                {
+                    continue;
+                }
+
+                expectedEntries++;
+                expectedStack += Math.Max(0, stack);
+            }
+
+            return true;
+        }
+        catch (Exception exception)
+        {
+            UsefulTankardsPlugin.Log.LogWarning($"Could not inspect tankard storage payload: {exception.GetBaseException().Message}");
+            return false;
+        }
+    }
+
+    private static void WarnIncompleteLoad(ItemDrop.ItemData tankard, int expectedStack, int actualStack)
+    {
+        string tankardName = TankardTweaks.GetCleanPrefabName(tankard);
+        string key = $"{tankardName}:{expectedStack}:{actualStack}";
+        if (!WarnedIncompleteLoads.Add(key))
+        {
+            return;
+        }
+
+        UsefulTankardsPlugin.Log.LogWarning($"Tankard storage for {tankardName} loaded only {actualStack}/{expectedStack} stored item stack. The stored data was preserved and the tankard storage was not opened.");
     }
 
     private static int ResolveStorageSlots(ItemDrop.ItemData tankard, TankardProfile profile)
@@ -381,33 +511,6 @@ internal static class TankardStorageSystem
         InventoryOwners.Remove(inventory);
     }
 
-    private static int CountTankards(Inventory inventory)
-    {
-        int count = 0;
-        foreach (ItemDrop.ItemData item in inventory.GetAllItems())
-        {
-            if (TankardTweaks.TryGetProfile(item, out _))
-            {
-                count += Math.Max(1, item.m_stack);
-            }
-        }
-
-        return count;
-    }
-
-    private static bool ContainsExactItem(Inventory inventory, ItemDrop.ItemData item)
-    {
-        foreach (ItemDrop.ItemData existing in inventory.GetAllItems())
-        {
-            if (ReferenceEquals(existing, item))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     private static void ClearStoredDrinkCheckCache()
     {
         _cachedStoredDrinkPlayer = null;
@@ -416,17 +519,15 @@ internal static class TankardStorageSystem
         _cachedStoredDrinkResult = false;
     }
 
-    private static void NotifyTankardLimitReached()
+    private static string LocalizeItemName(ItemDrop.ItemData item)
     {
-        if (MessageHud.instance == null || Time.unscaledTime < _nextLimitMessageTime)
+        string name = item.m_shared?.m_name ?? "";
+        if (Localization.instance == null || string.IsNullOrWhiteSpace(name))
         {
-            return;
+            return name;
         }
 
-        _nextLimitMessageTime = Time.unscaledTime + LimitMessageInterval;
-        string template = TankardLocalization.Localize(TankardLocalization.TankardLimitReachedKey);
-        string message = string.Format(template, UsefulTankardsPlugin.MaxTankardsInInventory.Value);
-        MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, message);
+        return Localization.instance.Localize(name);
     }
 
     private static bool IsAllowedStoredDrink(Inventory inventory, ItemDrop.ItemData item)
@@ -448,6 +549,20 @@ internal static class TankardStorageSystem
         return string.IsNullOrWhiteSpace(tankardAmmoType) ||
                string.Equals(item.m_shared.m_ammoType, tankardAmmoType, StringComparison.OrdinalIgnoreCase) ||
                ((Object)(object)item.m_dropPrefab != null && string.Equals(((Object)item.m_dropPrefab).name, tankardAmmoType, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private sealed class StoredDrinkSummary
+    {
+        internal StoredDrinkSummary(string name, int stack, int capacity)
+        {
+            Name = name;
+            Stack = stack;
+            Capacity = capacity;
+        }
+
+        internal string Name { get; }
+        internal int Stack { get; set; }
+        internal int Capacity { get; set; }
     }
 
     private static bool CanConsumeStoredDrinkQuietly(Player player, ItemDrop.ItemData tankard, ItemDrop.ItemData item)
@@ -489,18 +604,23 @@ internal static class TankardStorageSystem
         private ItemDrop.ItemData? _tankard;
         private Inventory? _inventory;
         private Container? _container;
+        private Action? _saveHandler;
+        private bool _loadComplete = true;
         private bool _closed;
+
+        internal bool LoadComplete => _loadComplete;
 
         internal void Initialize(Player player, ItemDrop.ItemData tankard, TankardProfile profile, Container container, int slots, int width, int height)
         {
             _player = player;
             _tankard = tankard;
             _container = container;
-            _inventory = LoadTankardStorageInventory(player, tankard, profile, out width, out height);
+            _inventory = LoadTankardStorageInventory(player, tankard, profile, out width, out height, out _loadComplete);
 
             ValheimAccess.SetContainerFields(container, tankard.m_shared.m_name, width, height, _inventory, inUse: true);
             tankard.m_customData[StorageSlotsKey] = slots.ToString();
-            Save();
+            AttachImmediateSave();
+            ValheimAccess.Changed(player.GetInventory());
         }
 
         private void Update()
@@ -522,12 +642,35 @@ internal static class TankardStorageSystem
 
         internal void Save()
         {
-            if (_tankard == null || _inventory == null)
+            if (_tankard == null || _inventory == null || !_loadComplete)
             {
                 return;
             }
 
             SaveTankardStorageInventory(_tankard, _inventory);
+            ValheimAccess.Changed(_player?.GetInventory());
+        }
+
+        private void AttachImmediateSave()
+        {
+            if (!_loadComplete || _inventory == null || _saveHandler != null)
+            {
+                return;
+            }
+
+            _saveHandler = Save;
+            ValheimAccess.AddInventoryChangedHandler(_inventory, _saveHandler);
+        }
+
+        private void DetachImmediateSave()
+        {
+            if (_saveHandler == null)
+            {
+                return;
+            }
+
+            ValheimAccess.RemoveInventoryChangedHandler(_inventory, _saveHandler);
+            _saveHandler = null;
         }
 
         internal void CloseAndDestroy()
@@ -539,6 +682,7 @@ internal static class TankardStorageSystem
 
             _closed = true;
             Save();
+            DetachImmediateSave();
             if (_inventory != null)
             {
                 UnregisterTankardStorageInventory(_inventory);

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using HarmonyLib;
 using UnityEngine;
 
@@ -6,18 +7,22 @@ namespace UsefulTankards;
 [HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.Awake))]
 internal static class UsefulTankardsObjectDBAwakePatch
 {
+    [HarmonyPriority(Priority.Last)]
     private static void Postfix()
     {
         TankardTweaks.ApplyItemDefinitions();
+        TankardRecipes.ApplyRecipeDefinitions();
     }
 }
 
 [HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.Awake))]
 internal static class UsefulTankardsZNetSceneAwakePatch
 {
+    [HarmonyPriority(Priority.Last)]
     private static void Postfix()
     {
         TankardTweaks.ApplyItemDefinitions();
+        TankardRecipes.ApplyRecipeDefinitions();
     }
 }
 
@@ -47,6 +52,125 @@ internal static class UsefulTankardsAttackRotationSpeedPatch
             && TankardTweaks.TryGetProfile(__instance.GetCurrentWeapon(), out _))
         {
             __result = Mathf.Max(__result, multiplier);
+        }
+    }
+}
+
+[HarmonyPatch(typeof(CharacterAnimEvent), nameof(CharacterAnimEvent.CustomFixedUpdate))]
+internal static class UsefulTankardsCharacterAnimEventAnimationSpeedPatch
+{
+    [HarmonyPriority(Priority.Last)]
+    private static void Prefix(Animator ___m_animator, Character ___m_character)
+    {
+        UsefulTankardsTankardAnimationSpeed.Apply(___m_animator, ___m_character);
+    }
+
+    [HarmonyPriority(Priority.Last)]
+    private static void Postfix(Animator ___m_animator, Character ___m_character)
+    {
+        UsefulTankardsTankardAnimationSpeed.Apply(___m_animator, ___m_character);
+    }
+}
+
+internal static class UsefulTankardsTankardAnimationSpeed
+{
+    private static readonly Dictionary<Humanoid, AnimationSpeedState> ActiveStates = new();
+
+    internal static void Apply(Animator animator, Character character)
+    {
+        if ((Object)(object)animator == null)
+        {
+            return;
+        }
+
+        if (character is not Humanoid humanoid)
+        {
+            return;
+        }
+
+        Apply(humanoid, animator);
+    }
+
+    private static void Apply(Humanoid humanoid, Animator animator)
+    {
+        float speed = UsefulTankardsPlugin.TankardAnimationSpeedMultiplier;
+        if (speed <= 1.0001f ||
+            !humanoid.InAttack() ||
+            !TankardTweaks.TryGetProfile(humanoid.GetCurrentWeapon(), out _))
+        {
+            Restore(humanoid);
+            return;
+        }
+
+        ZSyncAnimation zAnim = humanoid.GetZAnim();
+        if (!ActiveStates.TryGetValue(humanoid, out AnimationSpeedState state))
+        {
+            state = new AnimationSpeedState(animator, zAnim);
+            ActiveStates[humanoid] = state;
+        }
+        else if (!ReferenceEquals(state.Animator, animator))
+        {
+            state.Restore();
+            state = new AnimationSpeedState(animator, zAnim);
+            ActiveStates[humanoid] = state;
+        }
+
+        state.Apply(speed);
+    }
+
+    private static void Restore(Humanoid humanoid)
+    {
+        if (!ActiveStates.TryGetValue(humanoid, out AnimationSpeedState state))
+        {
+            return;
+        }
+
+        state.Restore();
+        ActiveStates.Remove(humanoid);
+    }
+
+    private sealed class AnimationSpeedState
+    {
+        private readonly ZSyncAnimation _zAnim;
+        private readonly float _originalSpeed;
+
+        internal AnimationSpeedState(Animator animator, ZSyncAnimation zAnim)
+        {
+            Animator = animator;
+            _zAnim = zAnim;
+            _originalSpeed = animator.speed;
+        }
+
+        internal Animator Animator { get; }
+
+        internal void Apply(float speed)
+        {
+            if ((Object)(object)Animator == null)
+            {
+                return;
+            }
+
+            if ((Object)(object)_zAnim != null)
+            {
+                _zAnim.SetSpeed(speed);
+            }
+
+            Animator.speed = speed;
+        }
+
+        internal void Restore()
+        {
+            if ((Object)(object)Animator == null)
+            {
+                return;
+            }
+
+            if ((Object)(object)_zAnim != null)
+            {
+                _zAnim.SetSpeed(_originalSpeed);
+            }
+
+            Animator.speed = _originalSpeed;
         }
     }
 }
@@ -133,5 +257,19 @@ internal static class UsefulTankardsItemTooltipPatch
     private static void Postfix(ItemDrop.ItemData item, ref string __result)
     {
         TankardTweaks.AppendTankardTooltip(item, ref __result);
+    }
+}
+
+[HarmonyPatch(typeof(ItemDrop.ItemData), nameof(ItemDrop.ItemData.GetWeight), new[] { typeof(int) })]
+internal static class UsefulTankardsItemWeightPatch
+{
+    private static void Postfix(ItemDrop.ItemData __instance, int stackOverride, ref float __result)
+    {
+        if (stackOverride == 0)
+        {
+            return;
+        }
+
+        __result += TankardStorageSystem.GetStoredDrinkWeight(__instance);
     }
 }

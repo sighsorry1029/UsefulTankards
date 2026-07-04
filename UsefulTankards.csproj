@@ -83,6 +83,10 @@
       <HintPath>$(CorlibPath)\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(CorlibPath)\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(CorlibPath)\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
@@ -95,6 +99,7 @@
   <ItemGroup>
     <Compile Include="Plugin.cs" />
     <Compile Include="TankardLocalization.cs" />
+    <Compile Include="TankardRecipes.cs" />
     <Compile Include="TankardTweaks.cs" />
     <Compile Include="TankardStorage.cs" />
     <Compile Include="ValheimAccess.cs" />
@@ -112,4 +117,7 @@
     <Content Include="ILRepack.targets" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="PackageRelease" AfterTargets="ILRepacker" Condition=" '$(Configuration)' == 'Release' ">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)BuildReleasePackage.ps1&quot; -ProjectDir &quot;$(ProjectDir).&quot; -TargetPath &quot;$(TargetPath)&quot; -TargetDir &quot;$(TargetDir).&quot; -AssemblyName &quot;$(AssemblyName)&quot;" />
+  </Target>
 </Project>

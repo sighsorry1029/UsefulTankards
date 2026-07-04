@@ -1,3 +1,4 @@
+using System;
 using System.Reflection;
 using HarmonyLib;
 
@@ -12,6 +13,7 @@ internal static class ValheimAccess
     private static readonly FieldInfo? ContainerHeightField = AccessTools.Field(typeof(Container), "m_height");
     private static readonly FieldInfo? ContainerInventoryField = AccessTools.Field(typeof(Container), "m_inventory");
     private static readonly FieldInfo? ContainerInUseField = AccessTools.Field(typeof(Container), "m_inUse");
+    private static readonly FieldInfo? InventoryOnChangedField = AccessTools.Field(typeof(Inventory), "m_onChanged");
     private static readonly MethodInfo? InventoryGuiCloseContainerMethod = AccessTools.Method(typeof(InventoryGui), nameof(InventoryGui.CloseContainer));
     private static readonly MethodInfo? InventoryChangedMethod = AccessTools.Method(typeof(Inventory), nameof(Inventory.Changed));
 
@@ -55,5 +57,27 @@ internal static class ValheimAccess
         {
             InventoryChangedMethod?.Invoke(inventory, null);
         }
+    }
+
+    internal static void AddInventoryChangedHandler(Inventory? inventory, Action handler)
+    {
+        if (inventory == null || InventoryOnChangedField == null)
+        {
+            return;
+        }
+
+        Action? existing = InventoryOnChangedField.GetValue(inventory) as Action;
+        InventoryOnChangedField.SetValue(inventory, (Action?)Delegate.Combine(existing, handler));
+    }
+
+    internal static void RemoveInventoryChangedHandler(Inventory? inventory, Action handler)
+    {
+        if (inventory == null || InventoryOnChangedField == null)
+        {
+            return;
+        }
+
+        Action? existing = InventoryOnChangedField.GetValue(inventory) as Action;
+        InventoryOnChangedField.SetValue(inventory, (Action?)Delegate.Remove(existing, handler));
     }
 }

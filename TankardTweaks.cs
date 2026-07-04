@@ -12,12 +12,14 @@ internal sealed class TankardProfile
     internal TankardProfile(
         string prefabName,
         ConfigEntry<int> durability,
+        ConfigEntry<UsefulTankardsPlugin.Toggle>? canBeRepaired,
         ConfigEntry<float> cooldownReduction,
         ConfigEntry<float> durationBonus,
         ConfigEntry<int> storageSlots)
     {
         PrefabName = prefabName;
         Durability = durability;
+        CanBeRepaired = canBeRepaired;
         CooldownReduction = cooldownReduction;
         DurationBonus = durationBonus;
         StorageSlots = storageSlots;
@@ -25,11 +27,13 @@ internal sealed class TankardProfile
 
     internal string PrefabName { get; }
     internal ConfigEntry<int> Durability { get; }
+    internal ConfigEntry<UsefulTankardsPlugin.Toggle>? CanBeRepaired { get; }
     internal ConfigEntry<float> CooldownReduction { get; }
     internal ConfigEntry<float> DurationBonus { get; }
     internal ConfigEntry<int> StorageSlots { get; }
 
     internal int DurabilityUses => Math.Max(0, Durability.Value);
+    internal bool Repairable => CanBeRepaired?.Value == UsefulTankardsPlugin.Toggle.On;
     internal int TankardStorageSlots => Math.Max(0, StorageSlots.Value);
     internal float CooldownReductionMultiplier => Math.Max(0f, 1f - Clamp(CooldownReduction.Value, 0f, 0.95f));
     internal float DurationBonusMultiplier => 1f + Math.Max(0f, DurationBonus.Value);
@@ -68,8 +72,17 @@ internal static class TankardTweaks
         int durability,
         float cooldownReduction,
         float durationBonus,
-        int storageSlots)
+        int storageSlots,
+        bool canBeRepairedConfig = true)
     {
+        ConfigEntry<UsefulTankardsPlugin.Toggle>? canBeRepaired = canBeRepairedConfig
+            ? plugin.ConfigEntry(
+                section,
+                "Can Be Repaired",
+                UsefulTankardsPlugin.Toggle.Off,
+                "If on, this tankard can be repaired at a valid repair station. If off, durability is limited-use only.",
+                order: 350)
+            : null;
         TankardProfile profile = new TankardProfile(
             prefabName,
             plugin.ConfigEntry(
@@ -78,6 +91,7 @@ internal static class TankardTweaks
                 durability,
                 new ConfigDescription("Tankard uses before it can no longer be used. 0 disables durability changes for this tankard.", new AcceptableValueRange<int>(0, 1000)),
                 order: 400),
+            canBeRepaired,
             plugin.ConfigEntry(
                 section,
                 "Potion Cooldown Reduction",
@@ -97,6 +111,11 @@ internal static class TankardTweaks
                 new ConfigDescription("Number of mead storage slots in this tankard. 0 disables storage for this tankard.", new AcceptableValueRange<int>(0, 20)),
                 order: 100));
         profile.Durability.SettingChanged += (_, _) => ApplyItemDefinitions();
+        if (profile.CanBeRepaired != null)
+        {
+            profile.CanBeRepaired.SettingChanged += (_, _) => ApplyItemDefinitions();
+        }
+
         Profiles[prefabName] = profile;
     }
 
@@ -182,6 +201,13 @@ internal static class TankardTweaks
             lines.Add(FormatTooltip(TankardLocalization.BuffDurationBonusKey, profile.DurationBonusPercent));
         }
 
+        List<string> storedDrinkLines = TankardStorageSystem.GetStoredDrinkTooltipLines(item);
+        if (storedDrinkLines.Count > 0)
+        {
+            lines.Add(TankardLocalization.Localize(TankardLocalization.StoredMeadsKey));
+            lines.AddRange(storedDrinkLines);
+        }
+
         if (lines.Count > 0)
         {
             tooltip += "\n\n<color=orange>" + string.Join("\n", lines.Where(line => !string.IsNullOrWhiteSpace(line))) + "</color>";
@@ -232,7 +258,7 @@ internal static class TankardTweaks
         shared.m_durabilityPerLevel = 0f;
         shared.m_useDurabilityDrain = 1f;
         shared.m_durabilityDrain = 0f;
-        shared.m_canBeReparied = false;
+        shared.m_canBeReparied = profile.Repairable;
         shared.m_destroyBroken = false;
     }
 

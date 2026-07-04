@@ -7,14 +7,12 @@ internal static class UsefulTankardsInventoryGuards
 {
     internal static bool CanAdd(Inventory inventory, ItemDrop.ItemData item)
     {
-        return TankardStorageSystem.CanAddToTankardStorage(inventory, item) &&
-               TankardStorageSystem.CanAddTankardToPlayerInventory(inventory, item);
+        return TankardStorageSystem.CanAddToTankardStorage(inventory, item);
     }
 
     internal static bool CanAdd(Inventory inventory, GameObject prefab)
     {
-        return TankardStorageSystem.CanAddToTankardStorage(inventory, prefab) &&
-               TankardStorageSystem.CanAddTankardToPlayerInventory(inventory, prefab);
+        return TankardStorageSystem.CanAddToTankardStorage(inventory, prefab);
     }
 }
 
