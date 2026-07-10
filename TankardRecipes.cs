@@ -1,4 +1,3 @@
-#nullable disable
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -6,26 +5,6 @@ using BepInEx.Configuration;
 using UnityEngine;
 
 namespace UsefulTankards;
-
-internal sealed class TankardRecipeProfile
-{
-    internal TankardRecipeProfile(
-        string prefabName,
-        ConfigEntry<UsefulTankardsPlugin.Toggle> enabled,
-        ConfigEntry<string> station,
-        ConfigEntry<string> resources)
-    {
-        PrefabName = prefabName;
-        Enabled = enabled;
-        Station = station;
-        Resources = resources;
-    }
-
-    internal string PrefabName { get; }
-    internal ConfigEntry<UsefulTankardsPlugin.Toggle> Enabled { get; }
-    internal ConfigEntry<string> Station { get; }
-    internal ConfigEntry<string> Resources { get; }
-}
 
 internal static class TankardRecipes
 {
@@ -57,7 +36,7 @@ internal static class TankardRecipes
                 section,
                 "Recipe Resources",
                 defaultResources,
-                "Resources required to craft this tankard. Format: Item:Amount, OtherItem:Amount.",
+                "Resources required to craft this tankard. Format: Item:Amount, OtherItem:Amount. Amounts may be zero; leave the value empty for no resource requirements.",
                 order: 930));
 
         profile.Enabled.SettingChanged += (_, _) => ApplyRecipeDefinitions();
@@ -83,38 +62,48 @@ internal static class TankardRecipes
 
     private static void ApplyRecipeDefinition(TankardRecipeProfile profile)
     {
-        Recipe recipe = FindRecipe(profile.PrefabName) ?? CreateRecipe(profile.PrefabName);
-        if ((UnityEngine.Object)(object)recipe == null)
-        {
-            return;
-        }
-
         if (profile.Enabled.Value != UsefulTankardsPlugin.Toggle.On)
         {
-            recipe.m_enabled = false;
+            Recipe? disabledRecipe = FindRecipe(profile.PrefabName);
+            if (disabledRecipe is null || (UnityEngine.Object)(object)disabledRecipe == null)
+            {
+                ItemDrop? disabledItem = ResolveItemDrop(profile.PrefabName);
+                if (disabledItem is null || (UnityEngine.Object)(object)disabledItem == null)
+                {
+                    return;
+                }
+
+                disabledRecipe = CreateRecipe(profile.PrefabName, disabledItem);
+            }
+
+            disabledRecipe.m_enabled = false;
             return;
         }
 
-        ItemDrop item = ResolveItemDrop(profile.PrefabName);
-        if ((UnityEngine.Object)(object)item == null)
+        ItemDrop? item = ResolveItemDrop(profile.PrefabName);
+        if (item is null || (UnityEngine.Object)(object)item == null)
         {
+            DisableExistingRecipe(profile.PrefabName);
             WarnOnce($"Could not apply recipe for '{profile.PrefabName}': item prefab was not found.");
             return;
         }
 
         if (!TryParseCraftingStationWithLevel(profile.Station.Value, out string stationName, out int stationLevel) ||
-            !TryResolveCraftingStation(stationName, out CraftingStation station))
+            !TryResolveCraftingStation(stationName, out CraftingStation? station))
         {
+            DisableExistingRecipe(profile.PrefabName);
             WarnOnce($"Could not apply recipe for '{profile.PrefabName}': crafting station '{profile.Station.Value}' was invalid or not found.");
             return;
         }
 
         if (!TryParseRequirements(profile.Resources.Value, out Piece.Requirement[] requirements))
         {
+            DisableExistingRecipe(profile.PrefabName);
             WarnOnce($"Could not apply recipe for '{profile.PrefabName}': resources '{profile.Resources.Value}' were invalid.");
             return;
         }
 
+        Recipe recipe = FindRecipe(profile.PrefabName) ?? CreateRecipe(profile.PrefabName, item);
         recipe.m_item = item;
         recipe.m_amount = 1;
         recipe.m_enabled = true;
@@ -125,8 +114,9 @@ internal static class TankardRecipes
         recipe.m_resources = requirements;
     }
 
-    private static Recipe FindRecipe(string prefabName)
+    private static Recipe? FindRecipe(string prefabName)
     {
+        string recipeName = GetRecipeName(prefabName);
         foreach (Recipe recipe in ObjectDB.instance.m_recipes)
         {
             if ((UnityEngine.Object)(object)recipe == null)
@@ -134,8 +124,7 @@ internal static class TankardRecipes
                 continue;
             }
 
-            if (string.Equals(((UnityEngine.Object)recipe).name, GetRecipeName(prefabName), StringComparison.OrdinalIgnoreCase) ||
-                IsRecipeForPrefab(recipe, prefabName))
+            if (string.Equals(((UnityEngine.Object)recipe).name, recipeName, StringComparison.OrdinalIgnoreCase))
             {
                 return recipe;
             }
@@ -144,14 +133,17 @@ internal static class TankardRecipes
         return null;
     }
 
-    private static Recipe CreateRecipe(string prefabName)
+    private static void DisableExistingRecipe(string prefabName)
     {
-        ItemDrop item = ResolveItemDrop(prefabName);
-        if ((UnityEngine.Object)(object)item == null)
+        Recipe? recipe = FindRecipe(prefabName);
+        if (recipe is not null && (UnityEngine.Object)(object)recipe != null)
         {
-            return null;
+            recipe.m_enabled = false;
         }
+    }
 
+    private static Recipe CreateRecipe(string prefabName, ItemDrop item)
+    {
         Recipe recipe = ScriptableObject.CreateInstance<Recipe>();
         ((UnityEngine.Object)recipe).name = GetRecipeName(prefabName);
         recipe.m_item = item;
@@ -159,20 +151,7 @@ internal static class TankardRecipes
         return recipe;
     }
 
-    private static bool IsRecipeForPrefab(Recipe recipe, string prefabName)
-    {
-        if ((UnityEngine.Object)(object)recipe.m_item == null)
-        {
-            return false;
-        }
-
-        return string.Equals(
-            NormalizePrefabName(((UnityEngine.Object)((Component)recipe.m_item).gameObject).name),
-            NormalizePrefabName(prefabName),
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool TryParseRequirements(string definition, out Piece.Requirement[] requirements)
+    private static bool TryParseRequirements(string? definition, out Piece.Requirement[] requirements)
     {
         List<Piece.Requirement> parsed = new();
         requirements = Array.Empty<Piece.Requirement>();
@@ -197,8 +176,8 @@ internal static class TankardRecipes
                 return false;
             }
 
-            ItemDrop item = ResolveItemDrop(itemName);
-            if ((UnityEngine.Object)(object)item == null)
+            ItemDrop? item = ResolveItemDrop(itemName);
+            if (item is null || (UnityEngine.Object)(object)item == null)
             {
                 WarnOnce($"Could not resolve recipe resource item '{itemName}'.");
                 return false;
@@ -217,13 +196,13 @@ internal static class TankardRecipes
         return true;
     }
 
-    private static bool TryParseCraftingStationWithLevel(string value, out string station, out int level)
+    private static bool TryParseCraftingStationWithLevel(string? value, out string station, out int level)
     {
         station = "None";
         level = 1;
 
         string[] parts = (value ?? "").Split(',');
-        if (parts.Length == 0 || parts.Length > 2)
+        if (parts.Length > 2)
         {
             return false;
         }
@@ -238,7 +217,7 @@ internal static class TankardRecipes
                (int.TryParse(parts[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out level) && level >= 1);
     }
 
-    private static bool TryResolveCraftingStation(string value, out CraftingStation station)
+    private static bool TryResolveCraftingStation(string value, out CraftingStation? station)
     {
         station = null;
         string normalized = NormalizePrefabName(value);
@@ -247,14 +226,20 @@ internal static class TankardRecipes
             return true;
         }
 
-        GameObject prefab = ResolvePrefab(normalized);
-        return prefab != null && prefab.TryGetComponent(out station);
+        GameObject? prefab = ResolvePrefab(normalized);
+        if (prefab == null || !prefab.TryGetComponent(out CraftingStation resolvedStation))
+        {
+            return false;
+        }
+
+        station = resolvedStation;
+        return true;
     }
 
-    private static ItemDrop ResolveItemDrop(string itemName)
+    private static ItemDrop? ResolveItemDrop(string itemName)
     {
         string normalized = NormalizePrefabName(itemName);
-        GameObject prefab = ObjectDB.instance?.GetItemPrefab(normalized);
+        GameObject? prefab = ObjectDB.instance?.GetItemPrefab(normalized);
         if (prefab == null)
         {
             prefab = ResolvePrefab(normalized);
@@ -263,12 +248,12 @@ internal static class TankardRecipes
         return prefab != null && prefab.TryGetComponent(out ItemDrop itemDrop) ? itemDrop : null;
     }
 
-    private static GameObject ResolvePrefab(string prefabName)
+    private static GameObject? ResolvePrefab(string prefabName)
     {
         string normalized = NormalizePrefabName(prefabName);
         if (ZNetScene.instance != null)
         {
-            GameObject prefab = ZNetScene.instance.GetPrefab(normalized);
+            GameObject? prefab = ZNetScene.instance.GetPrefab(normalized);
             if (prefab != null)
             {
                 return prefab;
@@ -313,12 +298,32 @@ internal static class TankardRecipes
                string.Equals(value, "null", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string NormalizePrefabName(string value)
+    private static string NormalizePrefabName(string? value)
     {
         value = (value ?? "").Trim();
         const string cloneSuffix = "(Clone)";
         return value.EndsWith(cloneSuffix, StringComparison.Ordinal)
             ? value.Substring(0, value.Length - cloneSuffix.Length).Trim()
             : value;
+    }
+
+    private sealed class TankardRecipeProfile
+    {
+        internal TankardRecipeProfile(
+            string prefabName,
+            ConfigEntry<UsefulTankardsPlugin.Toggle> enabled,
+            ConfigEntry<string> station,
+            ConfigEntry<string> resources)
+        {
+            PrefabName = prefabName;
+            Enabled = enabled;
+            Station = station;
+            Resources = resources;
+        }
+
+        internal string PrefabName { get; }
+        internal ConfigEntry<UsefulTankardsPlugin.Toggle> Enabled { get; }
+        internal ConfigEntry<string> Station { get; }
+        internal ConfigEntry<string> Resources { get; }
     }
 }

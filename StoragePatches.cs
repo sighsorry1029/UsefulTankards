@@ -3,19 +3,6 @@ using UnityEngine;
 
 namespace UsefulTankards;
 
-internal static class UsefulTankardsInventoryGuards
-{
-    internal static bool CanAdd(Inventory inventory, ItemDrop.ItemData item)
-    {
-        return TankardStorageSystem.CanAddToTankardStorage(inventory, item);
-    }
-
-    internal static bool CanAdd(Inventory inventory, GameObject prefab)
-    {
-        return TankardStorageSystem.CanAddToTankardStorage(inventory, prefab);
-    }
-}
-
 [HarmonyPatch(typeof(Container), "Awake")]
 internal static class UsefulTankardsContainerAwakePatch
 {
@@ -51,21 +38,6 @@ internal static class UsefulTankardsContainerSetInUsePatch
         }
 
         ValheimAccess.SetContainerInUse(__instance, inUse);
-        return false;
-    }
-}
-
-[HarmonyPatch(typeof(Container), nameof(Container.IsInUse))]
-internal static class UsefulTankardsContainerIsInUsePatch
-{
-    private static bool Prefix(Container __instance, ref bool __result)
-    {
-        if (!TankardStorageSystem.IsTankardStorageContainer(__instance))
-        {
-            return true;
-        }
-
-        __result = ValheimAccess.GetContainerInUse(__instance);
         return false;
     }
 }
@@ -136,7 +108,7 @@ internal static class UsefulTankardsInventoryCanAddItemPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
     {
-        if (UsefulTankardsInventoryGuards.CanAdd(__instance, item))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item))
         {
             return true;
         }
@@ -151,7 +123,7 @@ internal static class UsefulTankardsInventoryCanAddPrefabPatch
 {
     private static bool Prefix(Inventory __instance, GameObject prefab, ref bool __result)
     {
-        if (UsefulTankardsInventoryGuards.CanAdd(__instance, prefab))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, prefab))
         {
             return true;
         }
@@ -166,7 +138,7 @@ internal static class UsefulTankardsInventoryAddItemPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
     {
-        if (UsefulTankardsInventoryGuards.CanAdd(__instance, item))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item))
         {
             return true;
         }
@@ -181,7 +153,7 @@ internal static class UsefulTankardsInventoryAddPrefabPatch
 {
     private static bool Prefix(Inventory __instance, GameObject prefab, ref bool __result)
     {
-        if (UsefulTankardsInventoryGuards.CanAdd(__instance, prefab))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, prefab))
         {
             return true;
         }
@@ -196,7 +168,7 @@ internal static class UsefulTankardsInventoryAddItemAtPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
     {
-        if (UsefulTankardsInventoryGuards.CanAdd(__instance, item))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item))
         {
             return true;
         }
@@ -211,7 +183,7 @@ internal static class UsefulTankardsInventoryAddItemAmountPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
     {
-        if (UsefulTankardsInventoryGuards.CanAdd(__instance, item))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item))
         {
             return true;
         }
@@ -226,7 +198,7 @@ internal static class UsefulTankardsInventoryMoveItemPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item)
     {
-        return UsefulTankardsInventoryGuards.CanAdd(__instance, item);
+        return TankardStorageSystem.CanAddToTankardStorage(__instance, item);
     }
 }
 
@@ -235,7 +207,7 @@ internal static class UsefulTankardsInventoryMoveItemAmountPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
     {
-        if (UsefulTankardsInventoryGuards.CanAdd(__instance, item))
+        if (TankardStorageSystem.CanAddToTankardStorage(__instance, item))
         {
             return true;
         }

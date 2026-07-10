@@ -118,6 +118,6 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="PackageRelease" AfterTargets="ILRepacker" Condition=" '$(Configuration)' == 'Release' ">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)BuildReleasePackage.ps1&quot; -ProjectDir &quot;$(ProjectDir).&quot; -TargetPath &quot;$(TargetPath)&quot; -TargetDir &quot;$(TargetDir).&quot; -AssemblyName &quot;$(AssemblyName)&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)BuildReleasePackage.ps1&quot; -ProjectDir &quot;$(ProjectDir).&quot; -TargetPath &quot;$(TargetPath)&quot; -AssemblyName &quot;$(AssemblyName)&quot;" />
   </Target>
 </Project>

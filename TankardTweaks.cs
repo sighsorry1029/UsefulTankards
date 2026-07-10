@@ -10,14 +10,12 @@ namespace UsefulTankards;
 internal sealed class TankardProfile
 {
     internal TankardProfile(
-        string prefabName,
         ConfigEntry<int> durability,
-        ConfigEntry<UsefulTankardsPlugin.Toggle>? canBeRepaired,
+        ConfigEntry<UsefulTankardsPlugin.Toggle> canBeRepaired,
         ConfigEntry<float> cooldownReduction,
         ConfigEntry<float> durationBonus,
         ConfigEntry<int> storageSlots)
     {
-        PrefabName = prefabName;
         Durability = durability;
         CanBeRepaired = canBeRepaired;
         CooldownReduction = cooldownReduction;
@@ -25,15 +23,14 @@ internal sealed class TankardProfile
         StorageSlots = storageSlots;
     }
 
-    internal string PrefabName { get; }
     internal ConfigEntry<int> Durability { get; }
-    internal ConfigEntry<UsefulTankardsPlugin.Toggle>? CanBeRepaired { get; }
+    internal ConfigEntry<UsefulTankardsPlugin.Toggle> CanBeRepaired { get; }
     internal ConfigEntry<float> CooldownReduction { get; }
     internal ConfigEntry<float> DurationBonus { get; }
     internal ConfigEntry<int> StorageSlots { get; }
 
     internal int DurabilityUses => Math.Max(0, Durability.Value);
-    internal bool Repairable => CanBeRepaired?.Value == UsefulTankardsPlugin.Toggle.On;
+    internal bool Repairable => CanBeRepaired.Value == UsefulTankardsPlugin.Toggle.On;
     internal int TankardStorageSlots => Math.Max(0, StorageSlots.Value);
     internal float CooldownReductionMultiplier => Math.Max(0f, 1f - Clamp(CooldownReduction.Value, 0f, 0.95f));
     internal float DurationBonusMultiplier => 1f + Math.Max(0f, DurationBonus.Value);
@@ -72,26 +69,21 @@ internal static class TankardTweaks
         int durability,
         float cooldownReduction,
         float durationBonus,
-        int storageSlots,
-        bool canBeRepairedConfig = true)
+        int storageSlots)
     {
-        ConfigEntry<UsefulTankardsPlugin.Toggle>? canBeRepaired = canBeRepairedConfig
-            ? plugin.ConfigEntry(
-                section,
-                "Can Be Repaired",
-                UsefulTankardsPlugin.Toggle.Off,
-                "If on, this tankard can be repaired at a valid repair station. If off, durability is limited-use only.",
-                order: 350)
-            : null;
         TankardProfile profile = new TankardProfile(
-            prefabName,
             plugin.ConfigEntry(
                 section,
                 "Durability Uses",
                 durability,
                 new ConfigDescription("Tankard uses before it can no longer be used. 0 disables durability changes for this tankard.", new AcceptableValueRange<int>(0, 1000)),
                 order: 400),
-            canBeRepaired,
+            plugin.ConfigEntry(
+                section,
+                "Can Be Repaired",
+                UsefulTankardsPlugin.Toggle.Off,
+                "If on, this tankard can be repaired at a valid repair station. If off, durability is limited-use only.",
+                order: 350),
             plugin.ConfigEntry(
                 section,
                 "Potion Cooldown Reduction",
@@ -102,19 +94,16 @@ internal static class TankardTweaks
                 section,
                 "Buff Duration Bonus",
                 durationBonus,
-                new ConfigDescription("Duration bonus for non-over-time buffs drunk through this tankard. 0.10 means +10%.", new AcceptableValueRange<float>(0f, 10f)),
+                new ConfigDescription("Duration bonus for timed effects that are not pure recovery-over-time effects. 0.10 means +10%.", new AcceptableValueRange<float>(0f, 10f)),
                 order: 200),
             plugin.ConfigEntry(
                 section,
                 "Storage Slots",
                 storageSlots,
-                new ConfigDescription("Number of mead storage slots in this tankard. 0 disables storage for this tankard.", new AcceptableValueRange<int>(0, 20)),
+                new ConfigDescription("Minimum number of mead storage slots in this tankard. Above five, the rectangular grid rounds capacity up to the next multiple of five. 0 disables storage for this tankard.", new AcceptableValueRange<int>(0, 20)),
                 order: 100));
         profile.Durability.SettingChanged += (_, _) => ApplyItemDefinitions();
-        if (profile.CanBeRepaired != null)
-        {
-            profile.CanBeRepaired.SettingChanged += (_, _) => ApplyItemDefinitions();
-        }
+        profile.CanBeRepaired.SettingChanged += (_, _) => ApplyItemDefinitions();
 
         Profiles[prefabName] = profile;
     }
@@ -128,18 +117,6 @@ internal static class TankardTweaks
         }
 
         string prefabName = GetPrefabName(item);
-        return prefabName.Length > 0 && Profiles.TryGetValue(prefabName, out profile);
-    }
-
-    internal static bool TryGetProfile(GameObject? prefab, out TankardProfile profile)
-    {
-        profile = null!;
-        if (prefab == null || (UnityEngine.Object)(object)prefab == null)
-        {
-            return false;
-        }
-
-        string prefabName = CleanPrefabName(((UnityEngine.Object)prefab).name);
         return prefabName.Length > 0 && Profiles.TryGetValue(prefabName, out profile);
     }
 
@@ -158,67 +135,10 @@ internal static class TankardTweaks
             return;
         }
 
-        foreach (TankardProfile profile in Profiles.Values)
+        foreach (string prefabName in Profiles.Keys)
         {
-            ApplyItemDefinition(ZNetScene.instance.GetPrefab(profile.PrefabName));
+            ApplyItemDefinition(ZNetScene.instance.GetPrefab(prefabName));
         }
-    }
-
-    internal static void ModifyEffectForCurrentTankard(StatusEffect effect)
-    {
-        TankardProfile? profile = CurrentUseContext;
-        if (profile == null || effect.m_ttl <= 0f)
-        {
-            return;
-        }
-
-        float multiplier = IsPureOverTimeEffect(effect)
-            ? profile.CooldownReductionMultiplier
-            : profile.DurationBonusMultiplier;
-        effect.m_ttl *= multiplier;
-    }
-
-    internal static void AppendTankardTooltip(ItemDrop.ItemData item, ref string tooltip)
-    {
-        if (!TryGetProfile(item, out TankardProfile profile))
-        {
-            return;
-        }
-
-        List<string> lines = new();
-        if (profile.TankardStorageSlots > 0)
-        {
-            lines.Add(TankardLocalization.Localize(TankardLocalization.OpenHintKey));
-        }
-
-        if (profile.CooldownReductionPercent > 0f)
-        {
-            lines.Add(FormatTooltip(TankardLocalization.CooldownReductionKey, profile.CooldownReductionPercent));
-        }
-
-        if (profile.DurationBonusPercent > 0f)
-        {
-            lines.Add(FormatTooltip(TankardLocalization.BuffDurationBonusKey, profile.DurationBonusPercent));
-        }
-
-        List<string> storedDrinkLines = TankardStorageSystem.GetStoredDrinkTooltipLines(item);
-        if (storedDrinkLines.Count > 0)
-        {
-            lines.Add(TankardLocalization.Localize(TankardLocalization.StoredMeadsKey));
-            lines.AddRange(storedDrinkLines);
-        }
-
-        if (lines.Count > 0)
-        {
-            tooltip += "\n\n<color=orange>" + string.Join("\n", lines.Where(line => !string.IsNullOrWhiteSpace(line))) + "</color>";
-        }
-    }
-
-    private static string FormatTooltip(string key, float percentage)
-    {
-        string template = TankardLocalization.Localize(key);
-        string value = percentage.ToString("0.#", CultureInfo.InvariantCulture);
-        return string.Format(CultureInfo.InvariantCulture, template, value);
     }
 
     private static void ApplyItemDefinition(GameObject? prefab)
@@ -244,7 +164,7 @@ internal static class TankardTweaks
         ItemDrop.ItemData.SharedData shared = itemDrop.m_itemData.m_shared;
         if (!DurabilityBaselines.ContainsKey(prefabName))
         {
-            DurabilityBaselines[prefabName] = DurabilityBaseline.From(shared);
+            DurabilityBaselines[prefabName] = new DurabilityBaseline(shared);
         }
 
         if (profile.DurabilityUses <= 0)
@@ -260,6 +180,20 @@ internal static class TankardTweaks
         shared.m_durabilityDrain = 0f;
         shared.m_canBeReparied = profile.Repairable;
         shared.m_destroyBroken = false;
+    }
+
+    internal static void ModifyEffectForCurrentTankard(StatusEffect effect)
+    {
+        TankardProfile? profile = CurrentUseContext;
+        if (profile == null || effect.m_ttl <= 0f)
+        {
+            return;
+        }
+
+        float multiplier = IsPureOverTimeEffect(effect)
+            ? profile.CooldownReductionMultiplier
+            : profile.DurationBonusMultiplier;
+        effect.m_ttl *= multiplier;
     }
 
     private static bool IsPureOverTimeEffect(StatusEffect effect)
@@ -325,6 +259,49 @@ internal static class TankardTweaks
                && !stats.m_pheromoneFlee;
     }
 
+    internal static void AppendTankardTooltip(ItemDrop.ItemData item, ref string tooltip)
+    {
+        if (!TryGetProfile(item, out TankardProfile profile))
+        {
+            return;
+        }
+
+        List<string> lines = new();
+        if (profile.TankardStorageSlots > 0)
+        {
+            lines.Add(TankardLocalization.Localize(TankardLocalization.OpenHintKey));
+        }
+
+        if (profile.CooldownReductionPercent > 0f)
+        {
+            lines.Add(FormatTooltip(TankardLocalization.CooldownReductionKey, profile.CooldownReductionPercent));
+        }
+
+        if (profile.DurationBonusPercent > 0f)
+        {
+            lines.Add(FormatTooltip(TankardLocalization.BuffDurationBonusKey, profile.DurationBonusPercent));
+        }
+
+        List<string> storedDrinkLines = TankardStorageSystem.GetStoredDrinkTooltipLines(item);
+        if (storedDrinkLines.Count > 0)
+        {
+            lines.Add(TankardLocalization.Localize(TankardLocalization.StoredMeadsKey));
+            lines.AddRange(storedDrinkLines);
+        }
+
+        if (lines.Count > 0)
+        {
+            tooltip += "\n\n<color=orange>" + string.Join("\n", lines.Where(line => !string.IsNullOrWhiteSpace(line))) + "</color>";
+        }
+    }
+
+    private static string FormatTooltip(string key, float percentage)
+    {
+        string template = TankardLocalization.Localize(key);
+        string value = percentage.ToString("0.#", CultureInfo.InvariantCulture);
+        return string.Format(CultureInfo.InvariantCulture, template, value);
+    }
+
     private static string GetPrefabName(ItemDrop.ItemData item)
     {
         return (UnityEngine.Object)(object)item.m_dropPrefab != null
@@ -355,7 +332,7 @@ internal static class TankardTweaks
         private readonly float _useDurabilityDrain;
         private readonly float _durabilityDrain;
 
-        private DurabilityBaseline(ItemDrop.ItemData.SharedData shared)
+        internal DurabilityBaseline(ItemDrop.ItemData.SharedData shared)
         {
             _useDurability = shared.m_useDurability;
             _destroyBroken = shared.m_destroyBroken;
@@ -364,11 +341,6 @@ internal static class TankardTweaks
             _durabilityPerLevel = shared.m_durabilityPerLevel;
             _useDurabilityDrain = shared.m_useDurabilityDrain;
             _durabilityDrain = shared.m_durabilityDrain;
-        }
-
-        internal static DurabilityBaseline From(ItemDrop.ItemData.SharedData shared)
-        {
-            return new DurabilityBaseline(shared);
         }
 
         internal void Restore(ItemDrop.ItemData.SharedData shared)

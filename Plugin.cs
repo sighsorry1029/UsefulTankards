@@ -13,7 +13,7 @@ namespace UsefulTankards;
 public sealed class UsefulTankardsPlugin : BaseUnityPlugin
 {
     public const string ModName = "UsefulTankards";
-    public const string ModVersion = "1.0.0";
+    public const string ModVersion = "1.0.1";
     public const string Author = "sighsorry";
     public const string ModGuid = Author + "." + ModName;
     private const string ValheimCuisineGuid = "XutzBR.ValheimCuisine";
@@ -34,8 +34,8 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
     }
 
     private static ConfigEntry<Toggle> ServerConfigLocked = null!;
-    internal static ConfigEntry<float> MovementWhileDrinking = null!;
-    internal static ConfigEntry<float> TankardAnimationSpeed = null!;
+    private static ConfigEntry<float> MovementWhileDrinking = null!;
+    private static ConfigEntry<float> TankardAnimationSpeed = null!;
 
     internal static float MovementWhileDrinkingMultiplier => Math.Min(1f, Math.Max(0f, MovementWhileDrinking.Value));
     internal static float TankardAnimationSpeedMultiplier => Math.Min(3f, Math.Max(1f, TankardAnimationSpeed.Value));
@@ -47,6 +47,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
     private void Awake()
     {
         Log = Logger;
+        ValheimAccess.Validate();
 
         ServerConfigLocked = ConfigEntry(
             "1 - General",
@@ -73,8 +74,8 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
                 new AcceptableValueRange<float>(1f, 3f)),
             order: 850);
 
-        RoundMovementWhileDrinking();
-        RoundTankardAnimationSpeed();
+        NormalizeFloatConfig(MovementWhileDrinking, 0f, 1f, ref _roundingMovementWhileDrinking);
+        NormalizeFloatConfig(TankardAnimationSpeed, 1f, 3f, ref _roundingTankardAnimationSpeed);
         MovementWhileDrinking.SettingChanged += OnMovementWhileDrinkingChanged;
         TankardAnimationSpeed.SettingChanged += OnTankardAnimationSpeedChanged;
 
@@ -88,6 +89,13 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
             cooldownReduction: 0.10f,
             durationBonus: 0.10f,
             storageSlots: 3);
+        TankardRecipes.RegisterRecipe(
+            this,
+            "02 - Tankard",
+            "Tankard",
+            "piece_workbench, 1",
+            "FineWood:5, Resin:2");
+
         TankardTweaks.RegisterProfile(
             this,
             "03 - Anniversary Tankard",
@@ -96,6 +104,13 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
             cooldownReduction: 0.20f,
             durationBonus: 0.20f,
             storageSlots: 4);
+        TankardRecipes.RegisterRecipe(
+            this,
+            "03 - Anniversary Tankard",
+            "TankardAnniversary",
+            "piece_workbench, 1",
+            "Bronze:2, TrollHide:2, Iron:2");
+
         TankardTweaks.RegisterProfile(
             this,
             "04 - Dvergr Tankard",
@@ -116,85 +131,65 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
                 storageSlots: 5);
         }
 
-        TankardRecipes.RegisterRecipe(
-            this,
-            "02 - Tankard",
-            "Tankard",
-            "piece_workbench, 1",
-            "FineWood:5, Resin:2");
-        TankardRecipes.RegisterRecipe(
-            this,
-            "03 - Anniversary Tankard",
-            "TankardAnniversary",
-            "piece_workbench, 1",
-            "Bronze:2, TrollHide:2, Iron:2");
-
         _harmony.PatchAll();
     }
 
     private static void OnMovementWhileDrinkingChanged(object sender, EventArgs args)
     {
-        RoundMovementWhileDrinking();
+        NormalizeFloatConfig(MovementWhileDrinking, 0f, 1f, ref _roundingMovementWhileDrinking);
     }
 
     private static void OnTankardAnimationSpeedChanged(object sender, EventArgs args)
     {
-        RoundTankardAnimationSpeed();
+        NormalizeFloatConfig(TankardAnimationSpeed, 1f, 3f, ref _roundingTankardAnimationSpeed);
     }
 
-    private static void RoundMovementWhileDrinking()
+    private static void NormalizeFloatConfig(
+        ConfigEntry<float> configEntry,
+        float minimum,
+        float maximum,
+        ref bool normalizing)
     {
-        if (MovementWhileDrinking == null || _roundingMovementWhileDrinking)
+        if (normalizing)
         {
             return;
         }
 
-        float clamped = Math.Min(1f, Math.Max(0f, MovementWhileDrinking.Value));
+        float clamped = Math.Min(maximum, Math.Max(minimum, configEntry.Value));
         float rounded = (float)Math.Round(clamped, 2, MidpointRounding.AwayFromZero);
-        if (Math.Abs(MovementWhileDrinking.Value - rounded) <= 0.0001f)
+        if (Math.Abs(configEntry.Value - rounded) <= 0.0001f)
         {
             return;
         }
 
         try
         {
-            _roundingMovementWhileDrinking = true;
-            MovementWhileDrinking.Value = rounded;
+            normalizing = true;
+            configEntry.Value = rounded;
         }
         finally
         {
-            _roundingMovementWhileDrinking = false;
-        }
-    }
-
-    private static void RoundTankardAnimationSpeed()
-    {
-        if (TankardAnimationSpeed == null || _roundingTankardAnimationSpeed)
-        {
-            return;
-        }
-
-        float clamped = Math.Min(3f, Math.Max(1f, TankardAnimationSpeed.Value));
-        float rounded = (float)Math.Round(clamped, 2, MidpointRounding.AwayFromZero);
-        if (Math.Abs(TankardAnimationSpeed.Value - rounded) <= 0.0001f)
-        {
-            return;
-        }
-
-        try
-        {
-            _roundingTankardAnimationSpeed = true;
-            TankardAnimationSpeed.Value = rounded;
-        }
-        finally
-        {
-            _roundingTankardAnimationSpeed = false;
+            normalizing = false;
         }
     }
 
     private void OnDestroy()
     {
-        _harmony.UnpatchSelf();
+        try
+        {
+            TankardStorageSystem.CloseOpenTankardStorage();
+        }
+        finally
+        {
+            try
+            {
+                UsefulTankardsTankardAnimationSpeed.RestoreAll();
+            }
+            finally
+            {
+                _harmony.UnpatchSelf();
+            }
+        }
     }
 
     internal ConfigEntry<T> ConfigEntry<T>(

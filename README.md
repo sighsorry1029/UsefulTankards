@@ -1,6 +1,6 @@
 # UsefulTankards
 ![](https://i.ibb.co/0V68tjjV/Screenshot-2026-07-04-130544.png) <br>
-Turn tankards into practical adventuring gear: store meads inside them, drink from storage, move while drinking, tune animation speed, cooldown reduction, buff duration, durability, recipes, and ServerSync-backed settings. ValheimCuisine's Goblet of Kings is supported too.
+Turn tankards into practical adventuring gear. They can store and serve meads, modify drinking movement and animation speed, apply effect bonuses, use durability, and expose server-synced recipe and gameplay settings. ValheimCuisine's Goblet of Kings is supported too.
 
 ![](https://i.ibb.co/1YspPyys/mead2.gif) <br>
 Drink from a tankard without standing still. Movement and drinking speed are configurable.
@@ -23,15 +23,11 @@ Use DataForge if you want to align custom mead effect durations: https://thunder
 
 ## What It Adds
 
-- Tankards can store meads in their own small inventory.
-- Stored meads count toward item weight and are shown in the tankard tooltip.
-- Using a tankard drinks usable stored meads without needing them loose in your inventory.
-- Tankard drinking can allow partial movement instead of fully locking the player in place.
-- Tankard drinking animation speed can be tuned.
-- Health, stamina, and eitr-over-time potions can get shorter cooldowns.
-- Long-duration buffs can get longer durations.
-- Tankards gain configurable durability so they can act like limited-use drinking tools.
-- Tankard and Anniversary Tankard recipes can be configured.
+- Tankards store meads in a small inventory, include that storage in item weight and tooltips, and can drink usable stored meads directly.
+- Movement while drinking and drinking animation speed are configurable.
+- Pure recovery-over-time effects can get shorter cooldowns; other timed effects can get longer durations.
+- Configurable durability and repairability let tankards act as limited-use drinking tools.
+- Tankard and Anniversary Tankard recipes are configurable, and ValheimCuisine's Goblet of Kings is supported when installed.
 - ServerSync keeps gameplay-affecting settings aligned on dedicated servers.
 
 ## Tankard Progression
@@ -51,10 +47,10 @@ When a tankard is used, UsefulTankards checks the stored meads and drinks any th
 
 ## Potion And Buff Bonuses
 
-UsefulTankards treats instant/over-time recovery effects differently from long-duration utility effects.
+UsefulTankards classifies each timed status effect before applying a tankard bonus.
 
-- Effects with health, stamina, or eitr over time are treated as potion-style effects and can receive cooldown reduction.
-- Other timed effects are treated as buffs and can receive duration bonuses.
+- A pure recovery-over-time effect has health, stamina, or eitr recovery over time without any additional timed stat modifier. It is treated as a potion-style effect and can receive cooldown reduction.
+- Every other timed effect receives the buff-duration bonus instead. This includes mixed effects that combine recovery over time with another modifier.
 
 This makes tankards useful without turning every drink into the same kind of bonus.
 
@@ -73,7 +69,7 @@ Per-tankard options include:
 - repairability
 - potion cooldown reduction
 - buff duration bonus
-- storage slots
+- storage slots (values above five round the rectangular grid up to the next multiple of five)
 
 Recipe options are available for:
 
@@ -86,4 +82,4 @@ UsefulTankards is designed to stay lightweight and config-driven. ValheimCuisine
 
 ## Localization
 
-UsefulTankards includes built-in localized tooltip text for the tankard storage prompt and tankard bonus lines.
+UsefulTankards includes English and Korean tooltip text for the tankard storage prompt and tankard bonus lines. Any other selected language falls back to English.

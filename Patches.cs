@@ -118,15 +118,37 @@ internal static class UsefulTankardsTankardAnimationSpeed
         state.Apply(speed);
     }
 
-    private static void Restore(Humanoid humanoid)
+    internal static void Restore(Humanoid humanoid)
     {
         if (!ActiveStates.TryGetValue(humanoid, out AnimationSpeedState state))
         {
             return;
         }
 
-        state.Restore();
+        TryRestore(state);
         ActiveStates.Remove(humanoid);
+    }
+
+    internal static void RestoreAll()
+    {
+        foreach (AnimationSpeedState state in ActiveStates.Values)
+        {
+            TryRestore(state);
+        }
+
+        ActiveStates.Clear();
+    }
+
+    private static void TryRestore(AnimationSpeedState state)
+    {
+        try
+        {
+            state.Restore();
+        }
+        catch (System.Exception exception)
+        {
+            UsefulTankardsPlugin.Log.LogWarning($"Could not restore tankard animation speed: {exception.GetBaseException().Message}");
+        }
     }
 
     private sealed class AnimationSpeedState
@@ -175,12 +197,20 @@ internal static class UsefulTankardsTankardAnimationSpeed
     }
 }
 
+[HarmonyPatch(typeof(Humanoid), nameof(Humanoid.OnDestroy))]
+internal static class UsefulTankardsHumanoidDestroyPatch
+{
+    private static void Prefix(Humanoid __instance)
+    {
+        UsefulTankardsTankardAnimationSpeed.Restore(__instance);
+    }
+}
+
 internal static class UsefulTankardsAttackAmmo
 {
-    internal static bool HasStoredDrink(Humanoid character, ItemDrop.ItemData weapon, out TankardProfile profile)
+    internal static bool HasStoredDrink(Humanoid character, ItemDrop.ItemData weapon)
     {
-        profile = null!;
-        return TankardTweaks.TryGetProfile(weapon, out profile) &&
+        return TankardTweaks.TryGetProfile(weapon, out TankardProfile profile) &&
                character is Player player &&
                TankardStorageSystem.HasConsumableStoredDrink(player, weapon, profile);
     }
@@ -189,9 +219,9 @@ internal static class UsefulTankardsAttackAmmo
 [HarmonyPatch(typeof(Attack), nameof(Attack.UseAmmo))]
 internal static class UsefulTankardsUseAmmoPatch
 {
-    private static bool Prefix(Attack __instance, ref ItemDrop.ItemData ammoItem, ref bool __result, ref TankardProfile? __state)
+    private static bool Prefix(Attack __instance, ref ItemDrop.ItemData ammoItem, ref bool __result, ref UseContextState __state)
     {
-        __state = TankardTweaks.CurrentUseContext;
+        __state = new UseContextState(TankardTweaks.CurrentUseContext);
         if (TankardTweaks.TryGetProfile(__instance.GetWeapon(), out TankardProfile profile))
         {
             TankardTweaks.CurrentUseContext = profile;
@@ -206,9 +236,24 @@ internal static class UsefulTankardsUseAmmoPatch
         return true;
     }
 
-    private static void Postfix(TankardProfile? __state)
+    private static void Finalizer(UseContextState __state)
     {
-        TankardTweaks.CurrentUseContext = __state;
+        if (__state.Captured)
+        {
+            TankardTweaks.CurrentUseContext = __state.PreviousContext;
+        }
+    }
+
+    private readonly struct UseContextState
+    {
+        internal UseContextState(TankardProfile? previousContext)
+        {
+            PreviousContext = previousContext;
+            Captured = true;
+        }
+
+        internal TankardProfile? PreviousContext { get; }
+        internal bool Captured { get; }
     }
 }
 
@@ -217,7 +262,7 @@ internal static class UsefulTankardsEquipAmmoItemPatch
 {
     private static bool Prefix(Humanoid character, ItemDrop.ItemData weapon, ref bool __result)
     {
-        if (UsefulTankardsAttackAmmo.HasStoredDrink(character, weapon, out _))
+        if (UsefulTankardsAttackAmmo.HasStoredDrink(character, weapon))
         {
             __result = true;
             return false;
@@ -232,7 +277,7 @@ internal static class UsefulTankardsHaveAmmoPatch
 {
     private static bool Prefix(Humanoid character, ItemDrop.ItemData weapon, ref bool __result)
     {
-        if (!UsefulTankardsAttackAmmo.HasStoredDrink(character, weapon, out _))
+        if (!UsefulTankardsAttackAmmo.HasStoredDrink(character, weapon))
         {
             return true;
         }

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 
@@ -12,35 +11,18 @@ internal static class TankardLocalization
     internal const string BuffDurationBonusKey = "$ut_tankard_buff_duration_bonus";
     internal const string StoredMeadsKey = "$ut_tankard_stored_meads";
 
-    private const string OpenHintWord = "ut_tankard_open_hint";
-    private const string CooldownReductionWord = "ut_tankard_cooldown_reduction";
-    private const string BuffDurationBonusWord = "ut_tankard_buff_duration_bonus";
-    private const string StoredMeadsWord = "ut_tankard_stored_meads";
     private const string EnglishLanguage = "english";
+    private const string KoreanLanguage = "korean";
     private static readonly MethodInfo? AddWordMethod = AccessTools.Method(typeof(Localization), "AddWord", new[] { typeof(string), typeof(string) });
+    private static bool _addWordUnavailable;
+    private static bool _addWordFailureLogged;
 
-    private static readonly Dictionary<string, string> OpenHintByLanguage = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly (string Key, string English, string Korean)[] Translations =
     {
-        ["english"] = "Press <b>$KEY_Use</b> to open tankard storage.",
-        ["korean"] = "<b>$KEY_Use</b>를 눌러 탱커드 저장소를 엽니다.",
-    };
-
-    private static readonly Dictionary<string, string> CooldownReductionByLanguage = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["english"] = "Potion cooldown reduction: {0}%",
-        ["korean"] = "포션 재사용 대기시간 감소: {0}%",
-    };
-
-    private static readonly Dictionary<string, string> BuffDurationBonusByLanguage = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["english"] = "Buff duration bonus: {0}%",
-        ["korean"] = "버프 지속시간 증가: {0}%",
-    };
-
-    private static readonly Dictionary<string, string> StoredMeadsByLanguage = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["english"] = "Stored meads:",
-        ["korean"] = "저장된 벌꿀주:",
+        (OpenHintKey, "Press <b>$KEY_Use</b> to open tankard storage.", "<b>$KEY_Use</b>를 눌러 탱커드 저장소를 엽니다."),
+        (CooldownReductionKey, "Potion cooldown reduction: {0}%", "포션 재사용 대기시간 감소: {0}%"),
+        (BuffDurationBonusKey, "Buff duration bonus: {0}%", "버프 지속시간 증가: {0}%"),
+        (StoredMeadsKey, "Stored meads:", "저장된 벌꿀주:"),
     };
 
     internal static void Register()
@@ -51,7 +33,7 @@ internal static class TankardLocalization
         }
     }
 
-    internal static void Register(Localization localization)
+    internal static void Register(Localization? localization)
     {
         if (localization == null)
         {
@@ -59,10 +41,17 @@ internal static class TankardLocalization
         }
 
         string languageName = NormalizeLanguageName(localization.GetSelectedLanguage());
-        AddWord(localization, OpenHintWord, Get(OpenHintByLanguage, languageName));
-        AddWord(localization, CooldownReductionWord, Get(CooldownReductionByLanguage, languageName));
-        AddWord(localization, BuffDurationBonusWord, Get(BuffDurationBonusByLanguage, languageName));
-        AddWord(localization, StoredMeadsWord, Get(StoredMeadsByLanguage, languageName));
+        bool useKorean = languageName == KoreanLanguage;
+        foreach ((string key, string english, string korean) in Translations)
+        {
+            if (!AddWord(
+                    localization,
+                    key.Substring(1),
+                    useKorean ? korean : english))
+            {
+                return;
+            }
+        }
     }
 
     internal static string Localize(string key)
@@ -76,23 +65,54 @@ internal static class TankardLocalization
         return localized.Contains("$") ? Localization.instance.Localize(localized) : localized;
     }
 
-    private static string NormalizeLanguageName(string languageName)
+    private static string NormalizeLanguageName(string? languageName)
     {
         return string.IsNullOrWhiteSpace(languageName)
             ? EnglishLanguage
-            : languageName.Trim().Replace(" ", string.Empty).ToLowerInvariant();
+            : languageName!.Trim().Replace(" ", string.Empty).ToLowerInvariant();
     }
 
-    private static string Get(Dictionary<string, string> translations, string languageName)
+    private static bool AddWord(Localization localization, string key, string value)
     {
-        return translations.TryGetValue(languageName, out string translation)
-            ? translation
-            : translations[EnglishLanguage];
+        if (_addWordUnavailable)
+        {
+            return false;
+        }
+
+        if (AddWordMethod == null)
+        {
+            DisableAddWordRegistration("Localization.AddWord(string, string) was not found.");
+            return false;
+        }
+
+        try
+        {
+            AddWordMethod.Invoke(localization, new object[] { key, value });
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Exception cause = exception.GetBaseException();
+            LogAddWordFailureOnce($"Localization.AddWord failed: {cause.GetType().Name}: {cause.Message}");
+            return false;
+        }
     }
 
-    private static void AddWord(Localization localization, string key, string value)
+    private static void DisableAddWordRegistration(string reason)
     {
-        AddWordMethod?.Invoke(localization, new object[] { key, value });
+        _addWordUnavailable = true;
+        LogAddWordFailureOnce(reason);
+    }
+
+    private static void LogAddWordFailureOnce(string reason)
+    {
+        if (_addWordFailureLogged)
+        {
+            return;
+        }
+
+        _addWordFailureLogged = true;
+        UsefulTankardsPlugin.Log.LogError($"Could not register UsefulTankards localization. {reason}");
     }
 }
 
