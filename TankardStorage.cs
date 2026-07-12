@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -8,6 +9,7 @@ namespace UsefulTankards;
 internal static class TankardStorageSystem
 {
     private const string StorageDataKey = "UsefulTankards.Storage.Data";
+    private const string StorageWeightKey = "UsefulTankards.Storage.Weight";
 
     private static readonly HashSet<Inventory> StorageInventories = new();
     private static readonly Dictionary<Inventory, ItemDrop.ItemData> InventoryOwners = new();
@@ -67,18 +69,41 @@ internal static class TankardStorageSystem
 
     internal static float GetStoredDrinkWeight(ItemDrop.ItemData tankard)
     {
-        if (!TryLoadStoredInventorySnapshot(tankard, out Inventory inventory))
+        if (tankard == null ||
+            !TankardTweaks.TryGetProfile(tankard, out _) ||
+            tankard.m_customData == null)
         {
             return 0f;
         }
 
-        float weight = 0f;
-        foreach (ItemDrop.ItemData item in inventory.GetAllItems())
+        if (!tankard.m_customData.TryGetValue(StorageDataKey, out string rawData) ||
+            string.IsNullOrWhiteSpace(rawData))
         {
-            weight += item.GetWeight();
+            tankard.m_customData.Remove(StorageWeightKey);
+            return 0f;
         }
 
-        return weight;
+        if (TryGetStoredWeightCache(tankard, out float cachedWeight))
+        {
+            return cachedWeight;
+        }
+
+        // Inventory.Load instantiates every stored prefab and can consume ItemDataManager's
+        // one-shot upgrade transfer before the actual upgraded item awakens.
+        if (!TryReadStorageSummary(
+                rawData,
+                out _,
+                out _,
+                out _,
+                out float migratedWeight,
+                out bool hasCompleteWeight) ||
+            !hasCompleteWeight)
+        {
+            return 0f;
+        }
+
+        SetStoredWeightCache(tankard, migratedWeight);
+        return migratedWeight;
     }
 
     internal static List<string> GetStoredDrinkTooltipLines(ItemDrop.ItemData tankard)
@@ -346,7 +371,13 @@ internal static class TankardStorageSystem
 
     private static bool TryDeserializeTankardStorage(ItemDrop.ItemData tankard, Inventory inventory, string rawData)
     {
-        if (!TryReadExpectedStorageStack(rawData, out int version, out int expectedEntries, out int expectedStack))
+        if (!TryReadStorageSummary(
+                rawData,
+                out int version,
+                out int expectedEntries,
+                out int expectedStack,
+                out _,
+                out _))
         {
             WarnUnverifiableLoad(tankard, version);
             return false;
@@ -371,16 +402,18 @@ internal static class TankardStorageSystem
             return;
         }
 
-        ZPackage package = new();
-        inventory.Save(package);
-        string rawData = package.GetBase64();
-        if (inventory.GetAllItems().Count == 0)
+        List<ItemDrop.ItemData> items = inventory.GetAllItems();
+        if (items.Count == 0)
         {
             tankard.m_customData.Remove(StorageDataKey);
+            tankard.m_customData.Remove(StorageWeightKey);
         }
         else
         {
-            tankard.m_customData[StorageDataKey] = rawData;
+            ZPackage package = new();
+            inventory.Save(package);
+            tankard.m_customData[StorageDataKey] = package.GetBase64();
+            SetStoredWeightCache(tankard, CalculateStoredInventoryWeight(items));
         }
 
         ClearStoredDrinkCheckCache();
@@ -415,11 +448,19 @@ internal static class TankardStorageSystem
         return false;
     }
 
-    private static bool TryReadExpectedStorageStack(string rawData, out int version, out int expectedEntries, out int expectedStack)
+    private static bool TryReadStorageSummary(
+        string rawData,
+        out int version,
+        out int expectedEntries,
+        out int expectedStack,
+        out float storedWeight,
+        out bool hasCompleteWeight)
     {
         version = -1;
         expectedEntries = 0;
         expectedStack = 0;
+        storedWeight = 0f;
+        hasCompleteWeight = true;
         try
         {
             ZPackage package = new(rawData);
@@ -432,14 +473,15 @@ internal static class TankardStorageSystem
 
             for (int i = 0; i < itemCount; ++i)
             {
-                _ = package.ReadString();
+                string prefabName = package.ReadString();
                 int stack = package.ReadInt();
                 _ = package.ReadSingle();
                 _ = package.ReadVector2i();
                 _ = package.ReadBool();
+                int quality = 1;
                 if (version >= 101)
                 {
-                    _ = package.ReadInt();
+                    quality = package.ReadInt();
                 }
 
                 if (version >= 102)
@@ -480,14 +522,106 @@ internal static class TankardStorageSystem
 
                 expectedEntries++;
                 expectedStack += Math.Max(0, stack);
+                if (TryCalculateSerializedItemWeight(prefabName, stack, quality, out float itemWeight))
+                {
+                    storedWeight += itemWeight;
+                }
+                else
+                {
+                    hasCompleteWeight = false;
+                }
+            }
+
+            if (!IsValidStoredWeight(storedWeight))
+            {
+                storedWeight = 0f;
+                hasCompleteWeight = false;
             }
 
             return true;
         }
         catch (Exception)
         {
+            storedWeight = 0f;
+            hasCompleteWeight = false;
             return false;
         }
+    }
+
+    private static float CalculateStoredInventoryWeight(IEnumerable<ItemDrop.ItemData> items)
+    {
+        float weight = 0f;
+        foreach (ItemDrop.ItemData item in items)
+        {
+            if (item == null)
+            {
+                continue;
+            }
+
+            float itemWeight = item.GetWeight();
+            if (!IsValidStoredWeight(itemWeight))
+            {
+                return float.NaN;
+            }
+
+            weight += itemWeight;
+            if (!IsValidStoredWeight(weight))
+            {
+                return float.NaN;
+            }
+        }
+
+        return weight;
+    }
+
+    private static bool TryCalculateSerializedItemWeight(string prefabName, int stack, int quality, out float weight)
+    {
+        weight = 0f;
+        if (string.IsNullOrWhiteSpace(prefabName) || stack < 0 || ObjectDB.instance == null)
+        {
+            return false;
+        }
+
+        GameObject prefab = ObjectDB.instance.GetItemPrefab(prefabName);
+        if ((Object)(object)prefab == null ||
+            !prefab.TryGetComponent(out ItemDrop itemDrop) ||
+            itemDrop.m_itemData?.m_shared == null)
+        {
+            return false;
+        }
+
+        ItemDrop.ItemData.SharedData shared = itemDrop.m_itemData.m_shared;
+        weight = shared.m_weight * stack;
+        if (shared.m_scaleWeightByQuality != 0f && quality != 1)
+        {
+            weight += weight * (quality - 1) * shared.m_scaleWeightByQuality;
+        }
+
+        return IsValidStoredWeight(weight);
+    }
+
+    private static bool TryGetStoredWeightCache(ItemDrop.ItemData tankard, out float weight)
+    {
+        weight = 0f;
+        return tankard.m_customData.TryGetValue(StorageWeightKey, out string rawWeight) &&
+               float.TryParse(rawWeight, NumberStyles.Float, CultureInfo.InvariantCulture, out weight) &&
+               IsValidStoredWeight(weight);
+    }
+
+    private static void SetStoredWeightCache(ItemDrop.ItemData tankard, float weight)
+    {
+        if (!IsValidStoredWeight(weight))
+        {
+            tankard.m_customData.Remove(StorageWeightKey);
+            return;
+        }
+
+        tankard.m_customData[StorageWeightKey] = weight.ToString("R", CultureInfo.InvariantCulture);
+    }
+
+    private static bool IsValidStoredWeight(float weight)
+    {
+        return weight >= 0f && !float.IsNaN(weight) && !float.IsInfinity(weight);
     }
 
     private static void WarnUnverifiableLoad(ItemDrop.ItemData tankard, int version)

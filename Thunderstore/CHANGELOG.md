@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2
+
+- Prevented stored-mead weight checks from instantiating item prefabs and consuming another mod's pending item-upgrade data.
+- Cached stored drink weight in tankard metadata, with automatic non-instantiating migration for existing filled tankards.
+- Removed repeated storage reconstruction from routine carry-weight calculations.
+
 ## 1.0.1
 
 - Hardened tankard storage loading and lifecycle cleanup to preserve stored meads across missing data, item drops, and UI transitions.

@@ -13,7 +13,7 @@ namespace UsefulTankards;
 public sealed class UsefulTankardsPlugin : BaseUnityPlugin
 {
     public const string ModName = "UsefulTankards";
-    public const string ModVersion = "1.0.1";
+    public const string ModVersion = "1.0.2";
     public const string Author = "sighsorry";
     public const string ModGuid = Author + "." + ModName;
     private const string ValheimCuisineGuid = "XutzBR.ValheimCuisine";
