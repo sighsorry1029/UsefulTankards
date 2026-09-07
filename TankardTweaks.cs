@@ -102,10 +102,33 @@ internal static class TankardTweaks
                 storageSlots,
                 new ConfigDescription("Minimum number of mead storage slots in this tankard. Above five, the rectangular grid rounds capacity up to the next multiple of five. 0 disables storage for this tankard.", new AcceptableValueRange<int>(0, 20)),
                 order: 100));
-        profile.Durability.SettingChanged += (_, _) => ApplyItemDefinitions();
-        profile.CanBeRepaired.SettingChanged += (_, _) => ApplyItemDefinitions();
+        if (Profiles.TryGetValue(prefabName, out TankardProfile previousProfile))
+        {
+            UnsubscribeConfigurationEvents(previousProfile);
+        }
 
         Profiles[prefabName] = profile;
+        profile.Durability.SettingChanged += OnItemConfigurationChanged;
+        profile.CanBeRepaired.SettingChanged += OnItemConfigurationChanged;
+    }
+
+    internal static void UnsubscribeConfigurationEvents()
+    {
+        foreach (TankardProfile profile in Profiles.Values)
+        {
+            UnsubscribeConfigurationEvents(profile);
+        }
+    }
+
+    private static void UnsubscribeConfigurationEvents(TankardProfile profile)
+    {
+        profile.Durability.SettingChanged -= OnItemConfigurationChanged;
+        profile.CanBeRepaired.SettingChanged -= OnItemConfigurationChanged;
+    }
+
+    private static void OnItemConfigurationChanged(object sender, EventArgs args)
+    {
+        ApplyItemDefinitions();
     }
 
     internal static bool TryGetProfile(ItemDrop.ItemData? item, out TankardProfile profile)

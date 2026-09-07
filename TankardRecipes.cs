@@ -39,10 +39,35 @@ internal static class TankardRecipes
                 "Resources required to craft this tankard. Format: Item:Amount, OtherItem:Amount. Amounts may be zero; leave the value empty for no resource requirements.",
                 order: 930));
 
-        profile.Enabled.SettingChanged += (_, _) => ApplyRecipeDefinitions();
-        profile.Station.SettingChanged += (_, _) => ApplyRecipeDefinitions();
-        profile.Resources.SettingChanged += (_, _) => ApplyRecipeDefinitions();
+        if (Profiles.TryGetValue(prefabName, out TankardRecipeProfile previousProfile))
+        {
+            UnsubscribeConfigurationEvents(previousProfile);
+        }
+
         Profiles[prefabName] = profile;
+        profile.Enabled.SettingChanged += OnRecipeConfigurationChanged;
+        profile.Station.SettingChanged += OnRecipeConfigurationChanged;
+        profile.Resources.SettingChanged += OnRecipeConfigurationChanged;
+    }
+
+    internal static void UnsubscribeConfigurationEvents()
+    {
+        foreach (TankardRecipeProfile profile in Profiles.Values)
+        {
+            UnsubscribeConfigurationEvents(profile);
+        }
+    }
+
+    private static void UnsubscribeConfigurationEvents(TankardRecipeProfile profile)
+    {
+        profile.Enabled.SettingChanged -= OnRecipeConfigurationChanged;
+        profile.Station.SettingChanged -= OnRecipeConfigurationChanged;
+        profile.Resources.SettingChanged -= OnRecipeConfigurationChanged;
+    }
+
+    private static void OnRecipeConfigurationChanged(object sender, EventArgs args)
+    {
+        ApplyRecipeDefinitions();
     }
 
     internal static void ApplyRecipeDefinitions()

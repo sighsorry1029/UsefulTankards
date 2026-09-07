@@ -219,13 +219,14 @@ internal static class UsefulTankardsAttackAmmo
 [HarmonyPatch(typeof(Attack), nameof(Attack.UseAmmo))]
 internal static class UsefulTankardsUseAmmoPatch
 {
-    private static bool Prefix(Attack __instance, ref ItemDrop.ItemData ammoItem, ref bool __result, ref UseContextState __state)
+    private static bool Prefix(Attack __instance, Humanoid ___m_character, ref ItemDrop.ItemData ammoItem, ref bool __result, ref UseContextState __state)
     {
         __state = new UseContextState(TankardTweaks.CurrentUseContext);
         if (TankardTweaks.TryGetProfile(__instance.GetWeapon(), out TankardProfile profile))
         {
             TankardTweaks.CurrentUseContext = profile;
-            if (TankardStorageSystem.TryConsumeStoredDrinks(Player.m_localPlayer, __instance.GetWeapon(), profile, out ItemDrop.ItemData consumedAmmo))
+            if (___m_character is Player player &&
+                TankardStorageSystem.TryConsumeStoredDrinks(player, __instance.GetWeapon(), profile, out ItemDrop.ItemData consumedAmmo))
             {
                 ammoItem = consumedAmmo;
                 __result = true;

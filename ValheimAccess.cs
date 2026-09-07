@@ -15,6 +15,7 @@ internal static class ValheimAccess
     private static readonly FieldInfo ContainerInUseField = RequireField(typeof(Container), "m_inUse");
     private static readonly FieldInfo InventoryOnChangedField = RequireField(typeof(Inventory), "m_onChanged");
     private static readonly MethodInfo InventoryGuiCloseContainerMethod = RequireMethod(typeof(InventoryGui), nameof(InventoryGui.CloseContainer));
+    private static readonly MethodInfo InventoryGuiStackAllMethod = RequireMethod(typeof(InventoryGui), "OnStackAll");
     private static readonly MethodInfo InventoryChangedMethod = RequireMethod(typeof(Inventory), nameof(Inventory.Changed));
 
     internal static void Validate()
@@ -49,6 +50,11 @@ internal static class ValheimAccess
     internal static void CloseContainer(InventoryGui gui)
     {
         InventoryGuiCloseContainerMethod.Invoke(gui, null);
+    }
+
+    internal static void StackAll(InventoryGui gui)
+    {
+        InventoryGuiStackAllMethod.Invoke(gui, null);
     }
 
     internal static void Changed(Inventory? inventory)

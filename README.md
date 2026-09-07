@@ -83,3 +83,21 @@ UsefulTankards is designed to stay lightweight and config-driven. ValheimCuisine
 ## Localization
 
 UsefulTankards includes English and Korean tooltip text for the tankard storage prompt and tankard bonus lines. Any other selected language falls back to English.
+
+## Building And Checking Changes
+
+Build with Visual Studio MSBuild, the .NET Framework 4.8 developer pack, and a Valheim installation containing BepInEx and the publicized game assemblies:
+
+```powershell
+msbuild UsefulTankards.csproj /restore /p:Configuration=Debug /p:GamePath="C:\path\to\Valheim"
+```
+
+`GamePath` supplies default dependency paths; `BepInExPath`, `CorlibPath`, and `PublicizedAssembliesPath` can also be overridden individually. Release builds merge ServerSync and regenerate the Thunderstore manifest and ZIP.
+
+Run the storage regression checks with the .NET 8 SDK or a compatible newer SDK:
+
+```powershell
+dotnet run --project Tests/StorageRegression.csproj
+```
+
+These checks compile the production storage code against small game test doubles. They do not replace Valheim, Harmony, or multiplayer testing. See `Tests/README.md` in the source checkout for coverage and the remaining in-game checks.

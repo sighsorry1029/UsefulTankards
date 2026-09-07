@@ -51,6 +51,15 @@ internal static class UsefulTankardsContainerSavePatch
     }
 }
 
+[HarmonyPatch(typeof(Container), nameof(Container.StackAll))]
+internal static class UsefulTankardsContainerStackAllPatch
+{
+    private static bool Prefix(Container __instance)
+    {
+        return !TankardStorageSystem.TryStackAllTankardStorageContainer(__instance);
+    }
+}
+
 [HarmonyPatch(typeof(Container), nameof(Container.Load))]
 internal static class UsefulTankardsContainerLoadPatch
 {

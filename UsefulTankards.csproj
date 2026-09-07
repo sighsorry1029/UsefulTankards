@@ -42,12 +42,14 @@
         <GamePath Condition="!Exists('$(GamePath)') AND Exists('$(ValheimGamePath)')">$(ValheimGamePath)</GamePath>
         <GamePath Condition="!Exists('$(GamePath)')">C:\Program Files (x86)\Steam\steamapps\common\Valheim</GamePath>
         <GamePath Condition="!Exists('$(GamePath)')">C:\Program Files\Steam\steamapps\common\Valheim</GamePath>
-        <BepInExPath Condition="!Exists('$(BepInExPath)') AND Exists('$(GamePath)')">$(GamePath)\BepInEx</BepInExPath>
-        <CorlibPath Condition="!Exists('$(CorlibPath)') AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed</CorlibPath>
-        <PublicizedAssembliesPath Condition="!Exists('$(PublicizedAssembliesPath)') AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed\publicized_assemblies</PublicizedAssembliesPath>
       </PropertyGroup>
     </When>
   </Choose>
+  <PropertyGroup>
+    <BepInExPath Condition="'$(BepInExPath)' == '' AND Exists('$(GamePath)')">$(GamePath)\BepInEx</BepInExPath>
+    <CorlibPath Condition="'$(CorlibPath)' == '' AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed</CorlibPath>
+    <PublicizedAssembliesPath Condition="'$(PublicizedAssembliesPath)' == '' AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed\publicized_assemblies</PublicizedAssembliesPath>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony">
       <HintPath>$(BepInExPath)\core\0Harmony.dll</HintPath>

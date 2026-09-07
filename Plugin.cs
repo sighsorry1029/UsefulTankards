@@ -13,7 +13,7 @@ namespace UsefulTankards;
 public sealed class UsefulTankardsPlugin : BaseUnityPlugin
 {
     public const string ModName = "UsefulTankards";
-    public const string ModVersion = "1.0.2";
+    public const string ModVersion = "1.0.3";
     public const string Author = "sighsorry";
     public const string ModGuid = Author + "." + ModName;
     private const string ValheimCuisineGuid = "XutzBR.ValheimCuisine";
@@ -46,6 +46,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
 
     private void Awake()
     {
+        UnsubscribeConfigurationEvents();
         Log = Logger;
         ValheimAccess.Validate();
 
@@ -144,6 +145,22 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
         NormalizeFloatConfig(TankardAnimationSpeed, 1f, 3f, ref _roundingTankardAnimationSpeed);
     }
 
+    private static void UnsubscribeConfigurationEvents()
+    {
+        if (MovementWhileDrinking != null)
+        {
+            MovementWhileDrinking.SettingChanged -= OnMovementWhileDrinkingChanged;
+        }
+
+        if (TankardAnimationSpeed != null)
+        {
+            TankardAnimationSpeed.SettingChanged -= OnTankardAnimationSpeedChanged;
+        }
+
+        TankardTweaks.UnsubscribeConfigurationEvents();
+        TankardRecipes.UnsubscribeConfigurationEvents();
+    }
+
     private static void NormalizeFloatConfig(
         ConfigEntry<float> configEntry,
         float minimum,
@@ -187,7 +204,14 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
             }
             finally
             {
-                _harmony.UnpatchSelf();
+                try
+                {
+                    _harmony.UnpatchSelf();
+                }
+                finally
+                {
+                    UnsubscribeConfigurationEvents();
+                }
             }
         }
     }

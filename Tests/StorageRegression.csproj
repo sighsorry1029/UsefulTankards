@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <StorageSource Condition="'$(StorageSource)' == ''">../TankardStorage.cs</StorageSource>
+    <!-- .NET 8 annotates Dictionary.TryGetValue; the linked .NET Framework source predates those annotations. -->
+    <NoWarn>$(NoWarn);CS8600</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(StorageSource)" Link="Production/TankardStorage.cs" />
+    <Compile Include="GameDoubles.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>

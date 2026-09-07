@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.3
+
+- Reused an open tankard inventory for drinking and tooltip queries, preventing its old contents from overwriting a drink consumption when the storage closes.
+- Checked the attacking player's ownership and tankard inventory membership before consuming stored drinks, including after inventory callbacks.
+- Routed tankard quick-stacking through the local inventory UI instead of world-container RPCs.
+- Consolidated storage registration and skipped unused weight calculations during storage validation.
+- Detached configuration callbacks during plugin cleanup and prevented duplicate subscriptions when profiles are registered again.
+- Fixed builds that specify only GamePath while preserving individually overridden dependency paths.
+- Added storage regression checks for saved-data preservation, live inventory consumption, ownership changes, and cleanup.
+
 ## 1.0.2
 
 - Prevented stored-mead weight checks from instantiating item prefabs and consuming another mod's pending item-upgrade data.
