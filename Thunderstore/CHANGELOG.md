@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+- Added opt-in local deployment for Debug builds with DeployToGame=true, copying only the final ServerSync-merged plugin DLL after successful post-processing.
+- Added DeployToGameDirectory for custom plugin destinations and documented the Debug build and deployment workflow.
+- Kept local Debug deployment separate from Release packaging and version publishing.
+
 ## 1.0.3
 
 - Reused an open tankard inventory for drinking and tooltip queries, preventing its old contents from overwriting a drink consumption when the storage closes.

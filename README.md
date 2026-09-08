@@ -86,13 +86,13 @@ UsefulTankards includes English and Korean tooltip text for the tankard storage 
 
 ## Building And Checking Changes
 
-Build with Visual Studio MSBuild, the .NET Framework 4.8 developer pack, and a Valheim installation containing BepInEx and the publicized game assemblies:
+Build with the .NET SDK, the .NET Framework 4.8 developer pack, and a Valheim installation containing BepInEx and the publicized game assemblies:
 
 ```powershell
-msbuild UsefulTankards.csproj /restore /p:Configuration=Debug /p:GamePath="C:\path\to\Valheim"
+dotnet build UsefulTankards.csproj -c Debug -p:DeployToGame=true
 ```
 
-`GamePath` supplies default dependency paths; `BepInExPath`, `CorlibPath`, and `PublicizedAssembliesPath` can also be overridden individually. Release builds merge ServerSync and regenerate the Thunderstore manifest and ZIP.
+`GamePath` supplies default dependency paths; `BepInExPath`, `CorlibPath`, and `PublicizedAssembliesPath` can also be overridden individually. After a successful Debug build and ServerSync merge, `DeployToGame=true` copies only the final mod DLL to the local Valheim `BepInEx/plugins` folder. Use `DeployToGame=false` to skip copying, or `DeployToGameDirectory` to select another plugin folder. Debug builds do not generate release packages. Release builds merge ServerSync and regenerate the Thunderstore manifest and ZIP.
 
 Run the storage regression checks with the .NET 8 SDK or a compatible newer SDK:
 
