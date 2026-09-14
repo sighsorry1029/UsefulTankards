@@ -314,7 +314,8 @@ internal static class TankardTweaks
 
         if (lines.Count > 0)
         {
-            tooltip += "\n\n<color=orange>" + string.Join("\n", lines.Where(line => !string.IsNullOrWhiteSpace(line))) + "</color>";
+            // TMP's named orange is FF8000. Hex preserves it when EpicLoot replaces named color tags.
+            tooltip += "\n\n<color=#FF8000>" + string.Join("\n", lines.Where(line => !string.IsNullOrWhiteSpace(line))) + "</color>";
         }
     }
 

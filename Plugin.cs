@@ -10,10 +10,11 @@ namespace UsefulTankards;
 
 [BepInPlugin(ModGuid, ModName, ModVersion)]
 [BepInDependency(ValheimCuisineGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(EpicLootStorageCompatibility.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 public sealed class UsefulTankardsPlugin : BaseUnityPlugin
 {
     public const string ModName = "UsefulTankards";
-    public const string ModVersion = "1.0.4";
+    public const string ModVersion = "1.0.6";
     public const string Author = "sighsorry";
     public const string ModGuid = Author + "." + ModName;
     private const string ValheimCuisineGuid = "XutzBR.ValheimCuisine";
@@ -49,6 +50,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
         UnsubscribeConfigurationEvents();
         Log = Logger;
         ValheimAccess.Validate();
+        EpicLootStorageCompatibility.Initialize();
 
         ServerConfigLocked = ConfigEntry(
             "1 - General",
@@ -210,6 +212,7 @@ public sealed class UsefulTankardsPlugin : BaseUnityPlugin
                 }
                 finally
                 {
+                    EpicLootStorageCompatibility.Reset();
                     UnsubscribeConfigurationEvents();
                 }
             }

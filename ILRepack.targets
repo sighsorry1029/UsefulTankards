@@ -4,9 +4,9 @@
     <ItemGroup>
       <RepackReferenceFiles Include="$(BepInExPath)\core\BepInEx.dll" />
       <RepackReferenceFiles Include="$(BepInExPath)\core\0Harmony.dll" />
-      <RepackReferenceFiles Include="$(PublicizedAssembliesPath)\assembly_valheim_publicized.dll" />
-      <RepackReferenceFiles Include="$(PublicizedAssembliesPath)\assembly_utils_publicized.dll" />
-      <RepackReferenceFiles Include="$(PublicizedAssembliesPath)\assembly_guiutils_publicized.dll" />
+      <RepackReferenceFiles Include="$(CorlibPath)\assembly_valheim.dll" />
+      <RepackReferenceFiles Include="$(CorlibPath)\assembly_utils.dll" />
+      <RepackReferenceFiles Include="$(CorlibPath)\assembly_guiutils.dll" />
       <RepackReferenceFiles Include="$(CorlibPath)\netstandard.dll" />
       <RepackReferenceFiles Include="$(CorlibPath)\UnityEngine.dll" />
       <RepackReferenceFiles Include="$(CorlibPath)\UnityEngine.AnimationModule.dll" />
@@ -17,7 +17,6 @@
       <RepackLibraryPath Include="$(TargetDir)" />
       <RepackLibraryPath Include="$(BepInExPath)\core" Condition="Exists('$(BepInExPath)\core')" />
       <RepackLibraryPath Include="$(CorlibPath)" Condition="Exists('$(CorlibPath)')" />
-      <RepackLibraryPath Include="$(PublicizedAssembliesPath)" Condition="Exists('$(PublicizedAssembliesPath)')" />
     </ItemGroup>
     <Copy SourceFiles="@(RepackReferenceFiles)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
     <ILRepack

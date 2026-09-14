@@ -295,12 +295,7 @@ internal static class TankardRecipes
             return;
         }
 
-        Player.m_localPlayer.UpdateKnownRecipesList();
-        if (InventoryGui.instance != null)
-        {
-            InventoryGui.instance.UpdateCraftingPanel();
-            InventoryGui.instance.UpdateRecipe(Player.m_localPlayer, 0f);
-        }
+        ValheimAccess.RefreshCrafting(Player.m_localPlayer, InventoryGui.instance);
     }
 
     private static void WarnOnce(string message)

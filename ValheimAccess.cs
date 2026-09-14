@@ -14,9 +14,13 @@ internal static class ValheimAccess
     private static readonly FieldInfo ContainerInventoryField = RequireField(typeof(Container), "m_inventory");
     private static readonly FieldInfo ContainerInUseField = RequireField(typeof(Container), "m_inUse");
     private static readonly FieldInfo InventoryOnChangedField = RequireField(typeof(Inventory), "m_onChanged");
-    private static readonly MethodInfo InventoryGuiCloseContainerMethod = RequireMethod(typeof(InventoryGui), nameof(InventoryGui.CloseContainer));
+    private static readonly MethodInfo InventoryGuiCloseContainerMethod = RequireMethod(typeof(InventoryGui), "CloseContainer");
     private static readonly MethodInfo InventoryGuiStackAllMethod = RequireMethod(typeof(InventoryGui), "OnStackAll");
-    private static readonly MethodInfo InventoryChangedMethod = RequireMethod(typeof(Inventory), nameof(Inventory.Changed));
+    private static readonly MethodInfo InventoryChangedMethod = RequireMethod(typeof(Inventory), "Changed", typeof(bool), typeof(bool));
+    private static readonly MethodInfo PlayerUpdateKnownRecipesMethod = RequireMethod(typeof(Player), "UpdateKnownRecipesList");
+    private static readonly MethodInfo InventoryGuiUpdateCraftingPanelMethod = RequireMethod(typeof(InventoryGui), "UpdateCraftingPanel", typeof(bool));
+    private static readonly MethodInfo InventoryGuiUpdateRecipeMethod = RequireMethod(typeof(InventoryGui), "UpdateRecipe", typeof(Player), typeof(float));
+    private static readonly object[] InventoryChangedArguments = { false, false };
 
     internal static void Validate()
     {
@@ -61,7 +65,17 @@ internal static class ValheimAccess
     {
         if (inventory != null)
         {
-            InventoryChangedMethod.Invoke(inventory, null);
+            InventoryChangedMethod.Invoke(inventory, InventoryChangedArguments);
+        }
+    }
+
+    internal static void RefreshCrafting(Player player, InventoryGui? gui)
+    {
+        PlayerUpdateKnownRecipesMethod.Invoke(player, null);
+        if (gui != null)
+        {
+            InventoryGuiUpdateCraftingPanelMethod.Invoke(gui, new object[] { false });
+            InventoryGuiUpdateRecipeMethod.Invoke(gui, new object[] { player, 0f });
         }
     }
 
@@ -92,8 +106,8 @@ internal static class ValheimAccess
         return AccessTools.Field(type, name) ?? throw new MissingFieldException(type.FullName, name);
     }
 
-    private static MethodInfo RequireMethod(Type type, string name)
+    private static MethodInfo RequireMethod(Type type, string name, params Type[] parameters)
     {
-        return AccessTools.Method(type, name) ?? throw new MissingMethodException(type.FullName, name);
+        return AccessTools.Method(type, name, parameters) ?? throw new MissingMethodException(type.FullName, name);
     }
 }

@@ -8,33 +8,33 @@ internal static class Program
     internal const string WeightKey = "UsefulTankards.Storage.Weight";
     private static int _passed, _failed;
 
-    private static int Main()
+    private static int Main(string[] args)
     {
-        for (int version = 100; version <= 106; version++)
+        foreach (int stack in new[] { 1, 3, 65535 })
         {
-            int fixtureVersion = version;
-            Run($"v{version}: summary weight and complete inventory load", f =>
+            Run($"v109 stack {stack}: summary weight and complete inventory load", f =>
             {
-                f.Mead.m_quality = fixtureVersion >= 101 ? 2 : 1;
-                f.SetData(fixtureVersion, f.Mead);
+                f.Mead.m_quality = stack == 1 ? 1 : 2;
+                f.Mead.m_stack = stack;
+                f.SetData(109, f.Mead);
                 Equal(f.Mead.GetWeight(), TankardStorageSystem.GetStoredDrinkWeight(f.Tankard), "weight");
                 Equal(0, Inventory.LoadCalls, "weight lookup must not instantiate/load items");
                 var opened = f.Open();
                 Check(opened.Storage.LoadComplete, "supported fixture must load");
-                Equal(3, opened.Container.Inventory.GetAllItems().Single().m_stack, "stack survives load");
+                Equal(stack, opened.Container.Inventory.GetAllItems().Single().m_stack, "stack survives load");
                 Check(TankardStorageSystem.IsTankardStorageInventory(opened.Container.Inventory), "loaded storage registers");
             });
         }
 
         Run("summary validation does not resolve unused weights", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             var opened = f.Open();
             Check(opened.Storage.LoadComplete, "load succeeds");
             Equal(0, ObjectDB.instance!.LookupCount, "validation discarded weight, so no prefab lookup is needed");
         });
 
-        foreach (int version in new[] { 99, 107 })
+        foreach (int version in new[] { 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 110 })
         {
             Run($"unsupported version {version}: raw data survives close", f =>
                 AssertRejectedWithoutRewrite(f, InventoryFixtures.EncodeHeader(version, 1)));
@@ -42,24 +42,45 @@ internal static class Program
         Run("non-base64 data survives close", f => AssertRejectedWithoutRewrite(f, "this is not base64!"));
         Run("truncated item data survives close", f =>
         {
-            string valid = InventoryFixtures.Encode(106, new[] { f.Mead });
+            string valid = InventoryFixtures.Encode(109, new[] { f.Mead });
             byte[] bytes = Convert.FromBase64String(valid);
             AssertRejectedWithoutRewrite(f, Convert.ToBase64String(bytes[..^2]));
         });
-        Run("negative item count survives close", f => AssertRejectedWithoutRewrite(f, InventoryFixtures.EncodeHeader(106, -1)));
-        Run("negative custom-data count survives close", f =>
+        Run("excessive declared item count survives close", f => AssertRejectedWithoutRewrite(f, InventoryFixtures.EncodeHeader(109, 65535)));
+        Run("truncated custom-data count survives close", f =>
         {
             ZPackage package = new();
-            InventoryFixtures.WriteHeader(package.Writer, 104, 1);
-            InventoryFixtures.WriteItemPrefix(package.Writer, 104, f.Mead);
-            package.Writer.Write(-1);
+            f.Mead.m_customData["key"] = "value";
+            InventoryFixtures.WriteHeader(package.Writer, 109, 1);
+            InventoryFixtures.WriteItemPrefix(package.Writer, 109, f.Mead);
+            package.Writer.Write((byte)128);
             AssertRejectedWithoutRewrite(f, package.GetBase64());
+        });
+        foreach (int customCount in new[] { 1, 127, 128, 256 })
+        {
+            Run($"v109 custom data count {customCount} and optional fields", f =>
+            {
+                for (int i = 0; i < customCount; i++) f.Mead.m_customData[$"key{i}"] = $"value{i}";
+                f.SetData(109, f.Mead, f.OtherMead());
+                Equal(f.Mead.GetWeight(), TankardStorageSystem.GetStoredDrinkWeight(f.Tankard), "weight across variable-length fields");
+                Check(f.Open().Storage.LoadComplete, "both entries fully read");
+            });
+        }
+        Run("trailing bytes survive close", f =>
+        {
+            byte[] bytes = Convert.FromBase64String(InventoryFixtures.Encode(109, new[] { f.Mead }));
+            AssertRejectedWithoutRewrite(f, Convert.ToBase64String(bytes.Concat(new byte[] { 1 }).ToArray()));
+        });
+        Run("zero stack survives close", f =>
+        {
+            f.Mead.m_stack = 0;
+            AssertRejectedWithoutRewrite(f, InventoryFixtures.Encode(109, new[] { f.Mead }));
         });
         Run("missing prefab: partial load cannot replace raw data", f =>
         {
             ItemDrop.ItemData missing = f.Mead.Clone();
             missing.m_dropPrefab = new GameObject("removed_mod_mead");
-            f.SetData(106, f.Mead, missing);
+            f.SetData(109, f.Mead, missing);
             string raw = f.Tankard.m_customData[DataKey];
             InventoryFixtures.LoadedItems[raw] = new[] { f.Mead };
             var opened = f.Open();
@@ -71,7 +92,7 @@ internal static class Program
 
         Run("registry controls admissions and unregisters on close", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             var opened = f.Open();
             Inventory inventory = opened.Container.Inventory;
             Check(TankardStorageSystem.CanAddToTankardStorage(inventory, f.Mead), "matching mead allowed");
@@ -114,7 +135,7 @@ internal static class Program
 
         Run("open consumption survives later UI close", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             var opened = f.Open();
             Equal(1, Inventory.LoadCalls, "one initial load");
             Check(TankardStorageSystem.TryConsumeStoredDrinks(f.Player, f.Tankard, f.Profile, out var ammo), "drink consumed");
@@ -130,7 +151,7 @@ internal static class Program
         Run("last open mead stays removed after close", f =>
         {
             f.Mead.m_stack = 1;
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             var opened = f.Open();
             Check(TankardStorageSystem.TryConsumeStoredDrinks(f.Player, f.Tankard, f.Profile, out _), "last drink consumed");
             opened.Storage.CloseAndDestroy();
@@ -139,7 +160,7 @@ internal static class Program
         });
         Run("open tooltip and availability reuse inventory", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             f.Open();
             Check(TankardStorageSystem.HasConsumableStoredDrink(f.Player, f.Tankard, f.Profile), "available");
             Check(TankardStorageSystem.GetStoredDrinkTooltipLines(f.Tankard).Single().Contains("3/10", StringComparison.Ordinal), "tooltip uses stack");
@@ -147,13 +168,13 @@ internal static class Program
         });
         Run("closed consumption persists exactly one decrement", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             Check(TankardStorageSystem.TryConsumeStoredDrinks(f.Player, f.Tankard, f.Profile, out _), "closed drink consumed");
             Equal(2, InventoryFixtures.LoadedItems[f.Tankard.m_customData[DataKey]].Single().m_stack, "closed storage persists");
         });
         Run("failed consume keeps serialized data", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             string raw = f.Tankard.m_customData[DataKey];
             f.Player.AllowConsumption = false;
             Check(!TankardStorageSystem.TryConsumeStoredDrinks(f.Player, f.Tankard, f.Profile, out _), "failed consume reports false");
@@ -161,7 +182,7 @@ internal static class Program
         });
         Run("non-owner cannot consume stored items", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             string raw = f.Tankard.m_customData[DataKey];
             f.Player.Owner = false;
             Check(!TankardStorageSystem.TryConsumeStoredDrinks(f.Player, f.Tankard, f.Profile, out _), "non-owner rejected");
@@ -169,7 +190,7 @@ internal static class Program
         });
         Run("tankard removed from actor inventory cannot be consumed", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             f.Player.GetInventory().GetAllItems().Remove(f.Tankard);
             Check(!TankardStorageSystem.TryConsumeStoredDrinks(f.Player, f.Tankard, f.Profile, out _), "foreign item rejected");
             Check(!TankardStorageSystem.HasConsumableStoredDrink(f.Player, f.Tankard, f.Profile), "foreign item is not available");
@@ -177,7 +198,7 @@ internal static class Program
         });
         Run("immediate save invalidates same-frame availability", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             var opened = f.Open();
             Check(TankardStorageSystem.HasConsumableStoredDrink(f.Player, f.Tankard, f.Profile), "available initially");
             opened.Container.Inventory.GetAllItems().Clear();
@@ -190,7 +211,7 @@ internal static class Program
             {
                 ItemDrop.ItemData second = f.OtherMead();
                 f.Mead.m_stack = second.m_stack = 1;
-                f.SetData(106, f.Mead, second);
+                f.SetData(109, f.Mead, second);
                 var opened = f.Open();
                 ValheimAccess.AddInventoryChangedHandler(opened.Container.Inventory, () =>
                 {
@@ -206,7 +227,7 @@ internal static class Program
         {
             ItemDrop.ItemData second = f.OtherMead();
             f.Mead.m_stack = second.m_stack = 1;
-            f.SetData(106, f.Mead, second);
+            f.SetData(109, f.Mead, second);
             var opened = f.Open();
             ValheimAccess.AddInventoryChangedHandler(opened.Container.Inventory, () => opened.Container.Inventory.GetAllItems().Clear());
             Check(TankardStorageSystem.TryConsumeStoredDrinks(f.Player, f.Tankard, f.Profile, out _), "first drink consumed");
@@ -214,7 +235,7 @@ internal static class Program
         });
         Run("stack-all routes only the active owned tankard UI", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             var opened = f.Open();
             Check(TryStackAll(opened.Container), "local tankard request is handled");
             Equal(1, InventoryGui.instance.StackAllCalls, "active owned tankard routes to GUI once");
@@ -247,7 +268,7 @@ internal static class Program
         });
         Run("cached weight is invariant and does not load inventory", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             f.Tankard.m_customData[WeightKey] = "1.25";
             CultureInfo previous = CultureInfo.CurrentCulture;
             try
@@ -261,20 +282,93 @@ internal static class Program
         });
         Run("invalid cached weight migrates without instantiating items", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             f.Tankard.m_customData[WeightKey] = "NaN";
             Equal(f.Mead.GetWeight(), TankardStorageSystem.GetStoredDrinkWeight(f.Tankard), "invalid cache recomputed");
             Equal(0, Inventory.LoadCalls, "migration does not load inventory");
         });
         Run("missing prefab leaves incomplete weight uncached", f =>
         {
-            f.SetData(106, f.Mead);
+            f.SetData(109, f.Mead);
             ObjectDB.instance!.Prefabs.Clear();
             Equal(0f, TankardStorageSystem.GetStoredDrinkWeight(f.Tankard), "unknown item cannot supply weight");
             Check(!f.Tankard.m_customData.ContainsKey(WeightKey), "partial weight must not be cached");
             Check(f.Tankard.m_customData.ContainsKey(DataKey), "weight query preserves data");
         });
 
+        Run("Use opens owned tankard and consumes input before another prefix", f =>
+        {
+            InventoryGui.instance.Grid.Hovered = f.Tankard;
+            ZInput.UseDown = true;
+            Check(TankardStorageSystem.TryHandleInventoryGuiUseInput(InventoryGui.instance), "tankard handled");
+            Check(!ZInput.GetButtonDown("Use"), "later EpicLoot prefix cannot open sockets or consume again");
+            Check(TankardStorageSystem.IsTankardStorageContainer(InventoryGui.instance.Current), "storage opened");
+            ZInput.UseDown = true;
+            Check(TankardStorageSystem.TryHandleInventoryGuiUseInput(InventoryGui.instance), "second Use closes");
+            Check(InventoryGui.instance.Current == null, "storage closed");
+        });
+        foreach (string boundary in new[] { "hidden", "ordinary item", "disabled storage", "non-owner", "removed tankard", "world container", "no input" })
+        {
+            Run($"Use leaves {boundary} to existing handlers", f =>
+            {
+                var gui = InventoryGui.instance;
+                gui.Grid.Hovered = f.Tankard;
+                ZInput.UseDown = true;
+                switch (boundary)
+                {
+                    case "hidden": gui.Visible = false; break;
+                    case "ordinary item": gui.Grid.Hovered = f.Mead; break;
+                    case "disabled storage": f.Profile.TankardStorageSlots = 0; break;
+                    case "non-owner": f.Player.Owner = false; break;
+                    case "removed tankard": f.Player.GetInventory().RemoveItem(f.Tankard, 1); break;
+                    case "world container": gui.Current = new GameObject("chest").AddComponent<Container>(); break;
+                    case "no input": ZInput.UseDown = false; break;
+                }
+                var original = gui.Current;
+                Check(!TankardStorageSystem.TryHandleInventoryGuiUseInput(gui), "input not claimed");
+                Check(gui.Current == original, "existing UI preserved");
+                Equal(boundary != "no input", ZInput.UseDown, "input unchanged");
+            });
+        }
+        foreach (bool open in new[] { false, true })
+        {
+            Run($"EpicLoot modifier/prompt veto preserves input with tankard open={open}", f =>
+            {
+                if (open) f.Open();
+                var gui = InventoryGui.instance;
+                gui.Grid.Hovered = f.Tankard;
+                var original = gui.Current;
+                EpicLootStorageCompatibility.ShouldYieldUse = true;
+                ZInput.UseDown = true;
+                Check(!TankardStorageSystem.TryHandleInventoryGuiUseInput(gui), "EpicLoot retains input");
+                Check(ZInput.UseDown && gui.Current == original && gui.CloseCalls == 0, "no consumption or UI change");
+            });
+        }
+        foreach (string outcome in new[] { "closed", "still open", "item removed" })
+        {
+            Run($"socket overlay transition: {outcome}", f =>
+            {
+                var gui = InventoryGui.instance;
+                gui.Grid.Hovered = f.Tankard;
+                EpicLootStorageCompatibility.IsSocketGridOpen = true;
+                bool saved = false;
+                gui.OnClose = () =>
+                {
+                    Check(gui.Current == null, "old UI saved before tankard Show");
+                    saved = true;
+                    EpicLootStorageCompatibility.IsSocketGridOpen = outcome == "still open";
+                    if (outcome == "item removed") f.Player.GetInventory().RemoveItem(f.Tankard, 1);
+                };
+                ZInput.UseDown = true;
+                bool handled = TankardStorageSystem.TryHandleInventoryGuiUseInput(gui);
+                Check(saved && gui.CloseCalls == 1, "normal close path called once");
+                Equal(outcome == "closed", handled, "only safe transition opens storage");
+                Equal(outcome == "closed", gui.Current != null, "no overlapping UI or removed item opened");
+            });
+        }
+
+        if (args.Length > 0)
+            File.WriteAllText(args[0], System.Text.Json.JsonSerializer.Serialize(InventoryFixtures.ContractFixtures));
         Console.WriteLine($"{_passed} passed, {_failed} failed");
         return _failed == 0 ? 0 : 1;
     }
@@ -382,7 +476,12 @@ internal static class Program
         }
         public void Dispose()
         {
+            InventoryGui.instance.OnClose = null;
+            TankardStorageSystem.CloseOpenTankardStorage();
             foreach (var storage in _opened) storage.CloseAndDestroy();
+            EpicLootStorageCompatibility.ShouldYieldUse = false;
+            EpicLootStorageCompatibility.IsSocketGridOpen = false;
+            ZInput.UseDown = false;
             Player.m_localPlayer = null;
         }
     }
@@ -392,6 +491,7 @@ internal static class Program
 // is the only parser under test. Game Inventory.Load outcomes are prescribed separately.
 internal static class InventoryFixtures
 {
+    internal static readonly Dictionary<string, object> ContractFixtures = new();
     internal static readonly Dictionary<string, ItemDrop.ItemData[]> LoadedItems = new(StringComparer.Ordinal);
     internal static string Encode(int version, IEnumerable<ItemDrop.ItemData> items)
     {
@@ -412,35 +512,61 @@ internal static class InventoryFixtures
         foreach (ItemDrop.ItemData item in items)
         {
             WriteItemPrefix(package.Writer, version, item);
-            if (version >= 104)
+            if (item.m_customData.Count > 0)
             {
-                package.Writer.Write(item.m_customData.Count);
+                int count = item.m_customData.Count;
+                if (count < 128) package.Writer.Write((byte)count);
+                else { package.Writer.Write((byte)((count >> 8) | 128)); package.Writer.Write((byte)count); }
                 foreach (var entry in item.m_customData)
                 {
                     package.Writer.Write(entry.Key);
                     package.Writer.Write(entry.Value);
                 }
             }
-            if (version >= 105) package.Writer.Write(0);
-            if (version >= 106) package.Writer.Write(false);
+            package.Writer.Write((byte)1); // cheated flag must not shift the next item
         }
         LoadedItems[package.GetBase64()] = items;
+        ContractFixtures[package.GetBase64()] = items.Select(item => new
+        {
+            hash = PrefabHash(item.m_dropPrefab.name), stack = item.m_stack, quality = item.m_quality,
+            customData = item.m_customData
+        }).ToArray();
     }
     internal static void WriteHeader(BinaryWriter writer, int version, int count)
     {
         writer.Write(version);
-        writer.Write(count);
+        writer.Write((ushort)count);
     }
     internal static void WriteItemPrefix(BinaryWriter writer, int version, ItemDrop.ItemData item)
     {
-        writer.Write(item.m_dropPrefab.name);
-        writer.Write(item.m_stack);
-        writer.Write(100f);
-        writer.Write(item.m_gridPos.x);
-        writer.Write(item.m_gridPos.y);
-        writer.Write(false);
-        if (version >= 101) writer.Write(item.m_quality);
-        if (version >= 102) writer.Write(0);
-        if (version >= 103) { writer.Write(123L); writer.Write("fixture crafter"); }
+        writer.Write(10000); // fixed-point durability
+        writer.Write((byte)item.m_gridPos.x);
+        writer.Write((byte)item.m_gridPos.y);
+        writer.Write((byte)2); // world level
+        int flags = 1 | 2 | 64;
+        if (item.m_quality != 1) flags |= 4;
+        if (item.m_stack != 1) flags |= 8;
+        // Nonempty custom data fixtures exercise every optional field together.
+        if (item.m_customData.Count > 0) flags |= 16 | 32 | 128;
+        writer.Write((byte)flags);
+        if ((flags & 4) != 0) writer.Write((ushort)item.m_quality);
+        if ((flags & 8) != 0) writer.Write((ushort)item.m_stack);
+        if ((flags & 16) != 0) writer.Write(7);
+        if ((flags & 32) != 0) { writer.Write(123L); writer.Write("fixture crafter"); }
+        writer.Write(PrefabHash(item.m_dropPrefab.name));
+    }
+    internal static int PrefabHash(string value)
+    {
+        unchecked
+        {
+            int a = 5381, b = a;
+            for (int i = 0; i < value.Length; i += 2)
+            {
+                a = ((a << 5) + a) ^ value[i];
+                if (i + 1 == value.Length) break;
+                b = ((b << 5) + b) ^ value[i + 1];
+            }
+            return a + b * 1566083941;
+        }
     }
 }

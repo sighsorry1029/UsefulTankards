@@ -45,6 +45,8 @@ Press the interact key while hovering a tankard in your inventory to open its in
 
 When a tankard is used, UsefulTankards checks the stored meads and drinks any that can currently be consumed. Food rules, potion categories, and active status effect categories are respected.
 
+With EpicLoot's socket UI installed, Use opens tankard storage before EpicLoot consumes the input. Hold EpicLoot's configured `Socket Overlay Modifier` (normally LeftAlt) with Use to leave the input to its socket UI. EpicLoot confirmation prompts retain control, and switching from sockets to tankard storage closes and saves the socket UI first. Keep NewtonsoftJsonDetector installed; it is a required dependency of EpicLoot. This optional integration targets the UI contracts in EpicLoot 0.14.5; changed or missing contracts produce one startup warning and leave Use input to EpicLoot.
+
 ## Potion And Buff Bonuses
 
 UsefulTankards classifies each timed status effect before applying a tankard bonus.
@@ -86,13 +88,15 @@ UsefulTankards includes English and Korean tooltip text for the tankard storage 
 
 ## Building And Checking Changes
 
-Build with the .NET SDK, the .NET Framework 4.8 developer pack, and a Valheim installation containing BepInEx and the publicized game assemblies:
+This source targets Valheim **1.0.7**. Tankard storage accepts the game's **v109** inventory format. Older embedded tankard data (including v100–106), unsupported future formats, and incomplete loads are retained unchanged but cannot be opened or consumed. This mod does not migrate those payloads; the game's own character/world loading is unchanged.
+
+Build with the .NET SDK, the .NET Framework 4.8 developer pack, and a Valheim 1.0.7 installation containing BepInEx and original, unmodified game assemblies:
 
 ```powershell
 dotnet build UsefulTankards.csproj -c Debug -p:DeployToGame=true
 ```
 
-`GamePath` supplies default dependency paths; `BepInExPath`, `CorlibPath`, and `PublicizedAssembliesPath` can also be overridden individually. After a successful Debug build and ServerSync merge, `DeployToGame=true` copies only the final mod DLL to the local Valheim `BepInEx/plugins` folder. Use `DeployToGame=false` to skip copying, or `DeployToGameDirectory` to select another plugin folder. Debug builds do not generate release packages. Release builds merge ServerSync and regenerate the Thunderstore manifest and ZIP.
+`GamePath` supplies default dependency paths; `BepInExPath` and `CorlibPath` can also be overridden individually. Compilation and ILRepack use the original game assemblies. After a successful Debug build and ServerSync merge, `DeployToGame=true` copies only the final mod DLL to the local Valheim `BepInEx/plugins` folder. Use `DeployToGame=false` to skip copying, or `DeployToGameDirectory` to select another plugin folder. Debug builds do not generate release packages. Release builds merge ServerSync and regenerate the Thunderstore manifest and ZIP. The bundled ServerSync build is documented in [Libs/README.md](Libs/README.md).
 
 Run the storage regression checks with the .NET 8 SDK or a compatible newer SDK:
 

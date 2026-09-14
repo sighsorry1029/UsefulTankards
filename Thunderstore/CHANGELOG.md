@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.6
+
+- Added optional EpicLoot 0.14.5 input compatibility so Use opens tankard storage before EpicLoot consumes the key.
+- Preserved EpicLoot socket modifier and confirmation-prompt behavior, and safely closes the socket UI before opening tankard storage.
+- Kept tankard tooltip hints orange when EpicLoot rewrites named color tags.
+- Added real Harmony class-processing checks to catch effective patch-order regressions.
+
+## 1.0.5
+
+- Updated Harmony targets and private game access for Valheim 1.0.7, including the new tooltip, inventory insertion, crafting refresh, and inventory change signatures.
+- Updated tankard storage parsing for Valheim's compact v109 inventory format while preserving unsupported or incomplete payloads without rewriting them.
+- Rebuilt the bundled ServerSync library against the original Valheim 1.0.7 assemblies to support the new `ZRoutedRpc.Everybody` constant and current admin checks.
+- Switched compilation and ILRepack resolution from publicized assemblies to the original game assemblies.
+- Updated the packaged BepInEx dependency to `denikson-BepInExPack_Valheim-5.4.2350` and added original-game contract checks for client and dedicated-server APIs.
+
 ## 1.0.4
 
 - Added opt-in local deployment for Debug builds with DeployToGame=true, copying only the final ServerSync-merged plugin DLL after successful post-processing.

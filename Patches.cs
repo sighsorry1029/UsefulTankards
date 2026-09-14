@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace UsefulTankards;
 
-[HarmonyPatch(typeof(ObjectDB), nameof(ObjectDB.Awake))]
+[HarmonyPatch(typeof(ObjectDB), "Awake")]
 internal static class UsefulTankardsObjectDBAwakePatch
 {
     [HarmonyPriority(Priority.Last)]
@@ -15,7 +15,7 @@ internal static class UsefulTankardsObjectDBAwakePatch
     }
 }
 
-[HarmonyPatch(typeof(ZNetScene), nameof(ZNetScene.Awake))]
+[HarmonyPatch(typeof(ZNetScene), "Awake")]
 internal static class UsefulTankardsZNetSceneAwakePatch
 {
     [HarmonyPriority(Priority.Last)]
@@ -26,7 +26,7 @@ internal static class UsefulTankardsZNetSceneAwakePatch
     }
 }
 
-[HarmonyPatch(typeof(Humanoid), nameof(Humanoid.GetAttackSpeedFactorMovement))]
+[HarmonyPatch(typeof(Humanoid), "GetAttackSpeedFactorMovement")]
 internal static class UsefulTankardsAttackMovementSpeedPatch
 {
     private static void Postfix(Humanoid __instance, ref float __result)
@@ -41,7 +41,7 @@ internal static class UsefulTankardsAttackMovementSpeedPatch
     }
 }
 
-[HarmonyPatch(typeof(Humanoid), nameof(Humanoid.GetAttackSpeedFactorRotation))]
+[HarmonyPatch(typeof(Humanoid), "GetAttackSpeedFactorRotation")]
 internal static class UsefulTankardsAttackRotationSpeedPatch
 {
     private static void Postfix(Humanoid __instance, ref float __result)
@@ -197,7 +197,7 @@ internal static class UsefulTankardsTankardAnimationSpeed
     }
 }
 
-[HarmonyPatch(typeof(Humanoid), nameof(Humanoid.OnDestroy))]
+[HarmonyPatch(typeof(Humanoid), "OnDestroy")]
 internal static class UsefulTankardsHumanoidDestroyPatch
 {
     private static void Prefix(Humanoid __instance)
@@ -216,7 +216,7 @@ internal static class UsefulTankardsAttackAmmo
     }
 }
 
-[HarmonyPatch(typeof(Attack), nameof(Attack.UseAmmo))]
+[HarmonyPatch(typeof(Attack), "UseAmmo")]
 internal static class UsefulTankardsUseAmmoPatch
 {
     private static bool Prefix(Attack __instance, Humanoid ___m_character, ref ItemDrop.ItemData ammoItem, ref bool __result, ref UseContextState __state)
@@ -258,7 +258,7 @@ internal static class UsefulTankardsUseAmmoPatch
     }
 }
 
-[HarmonyPatch(typeof(Attack), nameof(Attack.EquipAmmoItem))]
+[HarmonyPatch(typeof(Attack), "EquipAmmoItem")]
 internal static class UsefulTankardsEquipAmmoItemPatch
 {
     private static bool Prefix(Humanoid character, ItemDrop.ItemData weapon, ref bool __result)
@@ -273,7 +273,7 @@ internal static class UsefulTankardsEquipAmmoItemPatch
     }
 }
 
-[HarmonyPatch(typeof(Attack), nameof(Attack.HaveAmmo))]
+[HarmonyPatch(typeof(Attack), "HaveAmmo")]
 internal static class UsefulTankardsHaveAmmoPatch
 {
     private static bool Prefix(Humanoid character, ItemDrop.ItemData weapon, ref bool __result)
@@ -297,7 +297,7 @@ internal static class UsefulTankardsStatusEffectSetupPatch
     }
 }
 
-[HarmonyPatch(typeof(ItemDrop.ItemData), nameof(ItemDrop.ItemData.GetTooltip), new[] { typeof(ItemDrop.ItemData), typeof(int), typeof(bool), typeof(float), typeof(int) })]
+[HarmonyPatch(typeof(ItemDrop.ItemData), nameof(ItemDrop.ItemData.GetTooltip), new[] { typeof(ItemDrop.ItemData), typeof(int), typeof(bool), typeof(float), typeof(int), typeof(bool) })]
 internal static class UsefulTankardsItemTooltipPatch
 {
     private static void Postfix(ItemDrop.ItemData item, ref string __result)

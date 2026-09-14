@@ -68,6 +68,15 @@ public sealed class ZPackage
         Writer = new BinaryWriter(_stream);
     }
     public int ReadInt() => _reader.ReadInt32();
+    public byte ReadByte() => _reader.ReadByte();
+    public ushort ReadUShort() => _reader.ReadUInt16();
+    public int ReadNumItems()
+    {
+        int count = ReadByte();
+        return (count & 128) != 0 ? ((count & 127) << 8) | ReadByte() : count;
+    }
+    public int GetPos() => (int)_stream.Position;
+    public int Size() => (int)_stream.Length;
     public float ReadSingle() => _reader.ReadSingle();
     public Vector2i ReadVector2i() => new(_reader.ReadInt32(), _reader.ReadInt32());
     public bool ReadBool() => _reader.ReadBoolean();
@@ -123,7 +132,7 @@ public sealed class Inventory
         // Tests prescribe the game loader's outcome, including missing-prefab/partial loads.
         _items.AddRange(InventoryFixtures.LoadedItems[package.GetBase64()].Select(item => item.Clone()));
     }
-    public void Save(ZPackage package) => InventoryFixtures.Write(package, 106, _items);
+    public void Save(ZPackage package) => InventoryFixtures.Write(package, 109, _items);
     public bool RemoveItem(ItemDrop.ItemData item, int amount)
     {
         if (!_items.Contains(item) || item.m_stack < amount) return false;
@@ -183,22 +192,30 @@ public sealed class ObjectDB
     internal readonly Dictionary<string, GameObject> Prefabs = new(StringComparer.Ordinal);
     internal int LookupCount;
     public GameObject GetItemPrefab(string name) { LookupCount++; return Prefabs.GetValueOrDefault(name)!; }
+    public GameObject GetItemPrefab(int hash) { LookupCount++; return Prefabs.FirstOrDefault(p => InventoryFixtures.PrefabHash(p.Key) == hash).Value!; }
 }
 public sealed class InventoryGui : Component
 {
     public static InventoryGui instance = null!;
     internal Container? Current;
     internal int StackAllCalls;
+    internal bool Visible = true;
+    internal InventoryGrid Grid = new();
+    internal Action? OnClose;
+    internal int CloseCalls;
+    public static bool IsVisible() => instance != null && instance.Visible;
     public void Show(Container container, int activeGroup) => Current = container;
 }
 public sealed class InventoryGrid : Component
 {
-    public ItemDrop.ItemData GetItem(Vector2i position) => null!;
+    internal ItemDrop.ItemData? Hovered;
+    public ItemDrop.ItemData GetItem(Vector2i position) => Hovered!;
 }
 public static class ZInput
 {
-    public static bool GetButtonDown(string name) => false;
-    public static void ResetButtonStatus(string name) { }
+    internal static bool UseDown;
+    public static bool GetButtonDown(string name) => UseDown;
+    public static void ResetButtonStatus(string name) => UseDown = false;
 }
 public sealed class Localization
 {
@@ -208,6 +225,12 @@ public sealed class Localization
 
 namespace UsefulTankards
 {
+    // External UI state is prescribed here; this does not execute EpicLoot or Harmony.
+    internal static class EpicLootStorageCompatibility
+    {
+        internal static bool ShouldYieldUse;
+        internal static bool IsSocketGridOpen;
+    }
     internal sealed class TankardProfile { internal int TankardStorageSlots = 3; }
     internal static class TankardTweaks
     {
@@ -233,9 +256,11 @@ namespace UsefulTankards
     internal static class ValheimAccess
     {
         internal static Container? GetCurrentContainer(InventoryGui? gui) => gui?.Current;
-        internal static InventoryGrid? GetPlayerGrid(InventoryGui gui) => null;
+        internal static InventoryGrid? GetPlayerGrid(InventoryGui gui) => gui.Grid;
         internal static void CloseContainer(InventoryGui gui)
         {
+            gui.CloseCalls++;
+            gui.OnClose?.Invoke();
             Container? current = gui.Current;
             gui.Current = null;
             // The real integration invokes this via InventoryGui.CloseContainer's Harmony postfix.

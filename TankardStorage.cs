@@ -158,7 +158,10 @@ internal static class TankardStorageSystem
     internal static bool TryHandleInventoryGuiUseInput(InventoryGui inventoryGui)
     {
         if (inventoryGui == null ||
-            Player.m_localPlayer == null)
+            !InventoryGui.IsVisible() ||
+            Player.m_localPlayer == null ||
+            !ZInput.GetButtonDown("Use") ||
+            EpicLootStorageCompatibility.ShouldYieldUse)
         {
             return false;
         }
@@ -166,17 +169,12 @@ internal static class TankardStorageSystem
         Container? currentContainer = ValheimAccess.GetCurrentContainer(inventoryGui);
         if (IsTankardStorageContainer(currentContainer))
         {
-            if (!ZInput.GetButtonDown("Use"))
-            {
-                return false;
-            }
-
             ZInput.ResetButtonStatus("Use");
             ValheimAccess.CloseContainer(inventoryGui);
             return true;
         }
 
-        if (currentContainer != null || !ZInput.GetButtonDown("Use"))
+        if (currentContainer != null)
         {
             return false;
         }
@@ -190,7 +188,25 @@ internal static class TankardStorageSystem
             return false;
         }
 
-        OpenTankardStorage(Player.m_localPlayer, hoveredItem, profile);
+        Player player = Player.m_localPlayer;
+        if (!player.IsOwner() || !player.GetInventory().ContainsItem(hoveredItem))
+        {
+            return false;
+        }
+
+        if (EpicLootStorageCompatibility.IsSocketGridOpen)
+        {
+            // Show alone does not close EpicLoot's overlay. Its CloseContainer prefix
+            // saves sockets, removes SaveSockets, and restores the container buttons.
+            ValheimAccess.CloseContainer(inventoryGui);
+            if (EpicLootStorageCompatibility.IsSocketGridOpen || Player.m_localPlayer != player ||
+                !player.IsOwner() || !player.GetInventory().ContainsItem(hoveredItem))
+            {
+                return false;
+            }
+        }
+
+        OpenTankardStorage(player, hoveredItem, profile);
         ZInput.ResetButtonStatus("Use");
         return true;
     }
@@ -517,44 +533,40 @@ internal static class TankardStorageSystem
         {
             ZPackage package = new(rawData);
             version = package.ReadInt();
-            int itemCount = package.ReadInt();
-            if (version < 100 || version > 106 || itemCount < 0)
+            // Valheim 1.0.7 Inventory.Save / ItemData.Save use the compact v109 layout.
+            // Reject other layouts before loading so an incomplete inventory cannot overwrite them.
+            if (version != 109)
             {
                 return false;
             }
+            int itemCount = package.ReadUShort();
 
             for (int i = 0; i < itemCount; ++i)
             {
-                string prefabName = package.ReadString();
-                int stack = package.ReadInt();
-                _ = package.ReadSingle();
-                _ = package.ReadVector2i();
-                _ = package.ReadBool();
-                int quality = 1;
-                if (version >= 101)
-                {
-                    quality = package.ReadInt();
-                }
-
-                if (version >= 102)
+                _ = package.ReadInt(); // durability * 100
+                _ = package.ReadByte(); // grid x
+                _ = package.ReadByte(); // grid y
+                _ = package.ReadByte(); // world level
+                byte flags = package.ReadByte();
+                int quality = (flags & 4) != 0 ? package.ReadUShort() : 1;
+                int stack = (flags & 8) != 0 ? package.ReadUShort() : 1;
+                if ((flags & 16) != 0)
                 {
                     _ = package.ReadInt();
                 }
-
-                if (version >= 103)
+                if ((flags & 32) != 0)
                 {
                     _ = package.ReadLong();
                     _ = package.ReadString();
                 }
-
-                if (version >= 104)
+                int prefabHash = (flags & 64) != 0 ? package.ReadInt() : 0;
+                if (prefabHash == 0 || stack <= 0 || quality <= 0)
                 {
-                    int customDataCount = package.ReadInt();
-                    if (customDataCount < 0)
-                    {
-                        return false;
-                    }
-
+                    return false;
+                }
+                if ((flags & 128) != 0)
+                {
+                    int customDataCount = package.ReadNumItems();
                     for (int j = 0; j < customDataCount; ++j)
                     {
                         _ = package.ReadString();
@@ -562,21 +574,13 @@ internal static class TankardStorageSystem
                     }
                 }
 
-                if (version >= 105)
-                {
-                    _ = package.ReadInt();
-                }
-
-                if (version >= 106)
-                {
-                    _ = package.ReadBool();
-                }
+                _ = package.ReadByte(); // additional flags, including cheated
 
                 expectedEntries++;
                 expectedStack += Math.Max(0, stack);
                 if (calculateWeight)
                 {
-                    if (TryCalculateSerializedItemWeight(prefabName, stack, quality, out float itemWeight))
+                    if (TryCalculateSerializedItemWeight(prefabHash, stack, quality, out float itemWeight))
                     {
                         storedWeight += itemWeight;
                     }
@@ -593,7 +597,7 @@ internal static class TankardStorageSystem
                 hasCompleteWeight = false;
             }
 
-            return true;
+            return package.GetPos() == package.Size();
         }
         catch (Exception)
         {
@@ -629,15 +633,15 @@ internal static class TankardStorageSystem
         return weight;
     }
 
-    private static bool TryCalculateSerializedItemWeight(string prefabName, int stack, int quality, out float weight)
+    private static bool TryCalculateSerializedItemWeight(int prefabHash, int stack, int quality, out float weight)
     {
         weight = 0f;
-        if (string.IsNullOrWhiteSpace(prefabName) || stack < 0 || ObjectDB.instance == null)
+        if (prefabHash == 0 || stack < 0 || ObjectDB.instance == null)
         {
             return false;
         }
 
-        GameObject prefab = ObjectDB.instance.GetItemPrefab(prefabName);
+        GameObject prefab = ObjectDB.instance.GetItemPrefab(prefabHash);
         if ((Object)(object)prefab == null ||
             !prefab.TryGetComponent(out ItemDrop itemDrop) ||
             itemDrop.m_itemData?.m_shared == null)

@@ -48,7 +48,6 @@
   <PropertyGroup>
     <BepInExPath Condition="'$(BepInExPath)' == '' AND Exists('$(GamePath)')">$(GamePath)\BepInEx</BepInExPath>
     <CorlibPath Condition="'$(CorlibPath)' == '' AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed</CorlibPath>
-    <PublicizedAssembliesPath Condition="'$(PublicizedAssembliesPath)' == '' AND Exists('$(GamePath)')">$(GamePath)\valheim_Data\Managed\publicized_assemblies</PublicizedAssembliesPath>
     <DeployToGameDirectory Condition="'$(DeployToGameDirectory)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Valheim\BepInEx\plugins</DeployToGameDirectory>
   </PropertyGroup>
   <ItemGroup>
@@ -57,15 +56,15 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="assembly_guiutils">
-      <HintPath>$(PublicizedAssembliesPath)\assembly_guiutils_publicized.dll</HintPath>
+      <HintPath>$(CorlibPath)\assembly_guiutils.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="assembly_utils">
-      <HintPath>$(PublicizedAssembliesPath)\assembly_utils_publicized.dll</HintPath>
+      <HintPath>$(CorlibPath)\assembly_utils.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="assembly_valheim">
-      <HintPath>$(PublicizedAssembliesPath)\assembly_valheim_publicized.dll</HintPath>
+      <HintPath>$(CorlibPath)\assembly_valheim.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="BepInEx">

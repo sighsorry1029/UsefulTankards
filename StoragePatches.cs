@@ -1,3 +1,7 @@
+using System;
+using System.Reflection;
+using BepInEx.Bootstrap;
+using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
 
@@ -42,7 +46,7 @@ internal static class UsefulTankardsContainerSetInUsePatch
     }
 }
 
-[HarmonyPatch(typeof(Container), nameof(Container.Save))]
+[HarmonyPatch(typeof(Container), "Save")]
 internal static class UsefulTankardsContainerSavePatch
 {
     private static bool Prefix(Container __instance)
@@ -60,7 +64,7 @@ internal static class UsefulTankardsContainerStackAllPatch
     }
 }
 
-[HarmonyPatch(typeof(Container), nameof(Container.Load))]
+[HarmonyPatch(typeof(Container), "Load")]
 internal static class UsefulTankardsContainerLoadPatch
 {
     private static bool Prefix(Container __instance, ref bool __result)
@@ -75,16 +79,79 @@ internal static class UsefulTankardsContainerLoadPatch
     }
 }
 
-[HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.Update))]
+[HarmonyPatch(typeof(InventoryGui), "Update")]
 internal static class UsefulTankardsInventoryGuiUpdatePatch
 {
+    // EpicLoot's socket UI uses First (800) and can consume Use over any item.
+    // Our handler only claims tankard input after respecting its modifier and prompt.
+    // Put priority on the method: the installed HarmonyX drops a class-only
+    // priority while merging an unannotated Prefix's default (-1).
+    [HarmonyPriority(Priority.First + 1)]
+    [HarmonyBefore(EpicLootStorageCompatibility.PluginGuid)]
     private static void Prefix(InventoryGui __instance)
     {
         TankardStorageSystem.TryHandleInventoryGuiUseInput(__instance);
     }
 }
 
-[HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.CloseContainer))]
+internal static class EpicLootStorageCompatibility
+{
+    internal const string PluginGuid = "randyknapp.mods.epicloot";
+    private static Func<bool>? _promptOpen;
+    private static Func<bool>? _socketGridOpen;
+    private static ConfigEntry<KeyCode>? _socketModifier;
+    private static bool _unavailable;
+
+    internal static void Initialize()
+    {
+        Reset();
+        if (!Chainloader.PluginInfos.TryGetValue(PluginGuid, out var plugin))
+        {
+            return;
+        }
+
+        try
+        {
+            Assembly assembly = plugin.Instance.GetType().Assembly;
+            _promptOpen = ResolveFlag(assembly, "EpicLoot.InventoryPromptHost", "IsOpen");
+            _socketGridOpen = ResolveFlag(assembly, "EpicLoot.ShardStones.SocketsUI", "IsSocketGridOpen");
+            Type config = assembly.GetType("EpicLoot.Config.ELConfig", throwOnError: true)!;
+            _socketModifier = AccessTools.Field(config, "SocketOverlayModifier")?.GetValue(null) as ConfigEntry<KeyCode>
+                ?? throw new MissingFieldException(config.FullName, "SocketOverlayModifier");
+            UsefulTankardsPlugin.Log.LogInfo("EpicLoot tankard input compatibility enabled (method priority 801).");
+        }
+        catch (Exception error)
+        {
+            Reset();
+            _unavailable = true;
+            UsefulTankardsPlugin.Log.LogWarning($"EpicLoot storage input compatibility is unavailable; leaving Use input to EpicLoot. {error.Message}");
+        }
+    }
+
+    private static Func<bool> ResolveFlag(Assembly assembly, string typeName, string propertyName)
+    {
+        Type type = assembly.GetType(typeName, throwOnError: true)!;
+        MethodInfo getter = AccessTools.PropertyGetter(type, propertyName)
+            ?? throw new MissingMethodException(typeName, "get_" + propertyName);
+        return (Func<bool>)Delegate.CreateDelegate(typeof(Func<bool>), getter);
+    }
+
+    // Resolve once at startup; neither reflection searches nor Invoke allocations on Update.
+    internal static bool ShouldYieldUse => _unavailable || (_promptOpen?.Invoke() ?? false) ||
+        (_socketModifier != null && Input.GetKey(_socketModifier.Value));
+
+    internal static bool IsSocketGridOpen => _socketGridOpen?.Invoke() ?? false;
+
+    internal static void Reset()
+    {
+        _promptOpen = null;
+        _socketGridOpen = null;
+        _socketModifier = null;
+        _unavailable = false;
+    }
+}
+
+[HarmonyPatch(typeof(InventoryGui), "CloseContainer")]
 internal static class UsefulTankardsInventoryGuiCloseContainerPatch
 {
     private static void Prefix(InventoryGui __instance, out Container __state)
@@ -187,7 +254,7 @@ internal static class UsefulTankardsInventoryAddItemAtPatch
     }
 }
 
-[HarmonyPatch(typeof(Inventory), nameof(Inventory.AddItem), new[] { typeof(ItemDrop.ItemData), typeof(int), typeof(int), typeof(int) })]
+[HarmonyPatch(typeof(Inventory), nameof(Inventory.AddItem), new[] { typeof(ItemDrop.ItemData), typeof(int), typeof(int), typeof(int), typeof(bool) })]
 internal static class UsefulTankardsInventoryAddItemAmountPatch
 {
     private static bool Prefix(Inventory __instance, ItemDrop.ItemData item, ref bool __result)
