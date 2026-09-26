@@ -10,6 +10,7 @@ internal static class TankardLocalization
     internal const string CooldownReductionKey = "$ut_tankard_cooldown_reduction";
     internal const string BuffDurationBonusKey = "$ut_tankard_buff_duration_bonus";
     internal const string StoredMeadsKey = "$ut_tankard_stored_meads";
+    internal const string StorageLoadFailedKey = "$ut_tankard_storage_load_failed";
 
     private const string EnglishLanguage = "english";
     private const string KoreanLanguage = "korean";
@@ -23,6 +24,7 @@ internal static class TankardLocalization
         (CooldownReductionKey, "Potion cooldown reduction: {0}%", "포션 재사용 대기시간 감소: {0}%"),
         (BuffDurationBonusKey, "Buff duration bonus: {0}%", "버프 지속시간 증가: {0}%"),
         (StoredMeadsKey, "Stored meads:", "저장된 벌꿀주:"),
+        (StorageLoadFailedKey, "Tankard storage could not be restored safely. Saved data was preserved. Check the log.", "맥주잔 저장소를 안전하게 복원하지 못했습니다. 저장 데이터는 보존했습니다. 로그를 확인해 주세요."),
     };
 
     internal static void Register()

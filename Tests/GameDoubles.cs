@@ -96,11 +96,19 @@ public sealed class ItemDrop : Component
         public int m_stack = 1;
         public int m_quality = 1;
         public Vector2i m_gridPos;
+        public float m_durability = 100f;
+        public int m_variant, m_worldLevel;
+        public long m_crafterID;
+        public string m_crafterName = "";
+        public bool m_equipped, m_pickedUp, m_cheated;
         public Sprite GetIcon() => new();
         public ItemData Clone() => new()
         {
             m_shared = m_shared, m_customData = new(m_customData), m_dropPrefab = m_dropPrefab,
-            m_stack = m_stack, m_quality = m_quality, m_gridPos = m_gridPos
+            m_stack = m_stack, m_quality = m_quality, m_gridPos = m_gridPos,
+            m_durability = m_durability, m_variant = m_variant, m_worldLevel = m_worldLevel,
+            m_crafterID = m_crafterID, m_crafterName = m_crafterName,
+            m_equipped = m_equipped, m_pickedUp = m_pickedUp, m_cheated = m_cheated
         };
         public float GetWeight() => m_shared.m_weight * m_stack * (1 + (m_quality - 1) * m_shared.m_scaleWeightByQuality);
         public enum ItemType { None, Consumable }
@@ -157,6 +165,8 @@ public sealed class Player : Component
     private readonly SEMan _effects = new();
     internal bool AllowEating = true, AllowConsumption = true, Owner = true;
     internal int Consumed, ConsumeAttempts;
+    internal readonly List<string> Messages = new();
+    public void Message(MessageHud.MessageType type, string message, int amount = 0, Sprite? icon = null, bool log = false) => Messages.Add(message);
     public Inventory GetInventory() => _inventory;
     public SEMan GetSEMan() => _effects;
     public bool IsOwner() => Owner;
@@ -172,6 +182,16 @@ public sealed class Player : Component
         Consumed++;
         return inventory.RemoveItem(item, 1);
     }
+}
+
+public sealed class MessageHud
+{
+    public enum MessageType { TopLeft, Center }
+}
+
+public static class StringExtensions
+{
+    public static int GetStableHashCode(this string value) => InventoryFixtures.PrefabHash(value);
 }
 
 public sealed class SEMan
@@ -225,6 +245,11 @@ public sealed class Localization
 
 namespace UsefulTankards
 {
+    internal static class TankardLocalization
+    {
+        internal const string StorageLoadFailedKey = "$ut_tankard_storage_load_failed";
+        internal static string Localize(string key) => key;
+    }
     // External UI state is prescribed here; this does not execute EpicLoot or Harmony.
     internal static class EpicLootStorageCompatibility
     {

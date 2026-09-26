@@ -43,6 +43,8 @@ Each supported tankard has its own settings for durability, repairability, potio
 
 Press the interact key while hovering a tankard in your inventory to open its internal storage. Only drinkable consumables with a consume status effect can be placed inside. Stored meads are saved on change, so tooltip contents, dropped tankards, and item weight stay in sync.
 
+Storage loading verifies each saved item's identity, quantity and metadata before allowing access. If restoration changes that data, the tankard keeps its original stored data and refuses to open or consume its contents. Opening it displays a warning; the log identifies the differing field. A metadata migration performed by another mod can also trigger this protection and needs investigation before the storage can be used.
+
 When a tankard is used, UsefulTankards checks the stored meads and drinks any that can currently be consumed. Food rules, potion categories, and active status effect categories are respected.
 
 With EpicLoot's socket UI installed, Use opens tankard storage before EpicLoot consumes the input. Hold EpicLoot's configured `Socket Overlay Modifier` (normally LeftAlt) with Use to leave the input to its socket UI. EpicLoot confirmation prompts retain control, and switching from sockets to tankard storage closes and saves the socket UI first. Keep NewtonsoftJsonDetector installed; it is a required dependency of EpicLoot. This optional integration targets the UI contracts in EpicLoot 0.14.5; changed or missing contracts produce one startup warning and leave Use input to EpicLoot.

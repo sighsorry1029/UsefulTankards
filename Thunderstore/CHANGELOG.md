@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.7
+
+- Validate each stored mead's identity, quantity, quality, variant, crafter information, and custom data after loading, including other persisted item fields.
+- Preserve the original storage data and block opening or consuming its contents when restoration loses or changes item information, even if item counts and total quantities still match.
+- Show a localized warning when storage cannot be restored safely and log the differing field. Normal item ordering, custom-data ordering, and supported game normalization remain accepted.
+- Added metadata-preservation regression coverage and expanded checks against the original Valheim item reader. This protection does not recover storage data already removed by another process.
+- Updated the packaged BepInEx dependency to `denikson-BepInExPack_Valheim-5.4.2351`.
+
 ## 1.0.6
 
 - Added optional EpicLoot 0.14.5 input compatibility so Use opens tankard storage before EpicLoot consumes the key.

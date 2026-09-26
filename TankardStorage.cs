@@ -369,6 +369,7 @@ internal static class TankardStorageSystem
         if (!storage.LoadComplete)
         {
             storage.CloseAndDestroy();
+            player.Message(MessageHud.MessageType.Center, TankardLocalization.Localize(TankardLocalization.StorageLoadFailedKey));
             return;
         }
 
@@ -437,6 +438,7 @@ internal static class TankardStorageSystem
 
     private static bool TryDeserializeTankardStorage(ItemDrop.ItemData tankard, Inventory inventory, string rawData)
     {
+        Dictionary<int, StoredItemSnapshot> expectedItems = new();
         if (!TryReadStorageSummary(
                 rawData,
                 out int version,
@@ -444,7 +446,8 @@ internal static class TankardStorageSystem
                 out int expectedStack,
                 out _,
                 out _,
-                calculateWeight: false))
+                calculateWeight: false,
+                expectedItems: expectedItems))
         {
             WarnUnverifiableLoad(tankard, version);
             return false;
@@ -453,7 +456,7 @@ internal static class TankardStorageSystem
         try
         {
             inventory.Load(new ZPackage(rawData));
-            return IsStorageLoadComplete(tankard, inventory, expectedEntries, expectedStack);
+            return IsStorageLoadComplete(tankard, inventory, expectedEntries, expectedStack, expectedItems);
         }
         catch (Exception exception)
         {
@@ -492,13 +495,9 @@ internal static class TankardStorageSystem
         return new Inventory(name, tankard?.GetIcon(), width, height);
     }
 
-    private static bool IsStorageLoadComplete(ItemDrop.ItemData tankard, Inventory inventory, int expectedEntries, int expectedStack)
+    private static bool IsStorageLoadComplete(ItemDrop.ItemData tankard, Inventory inventory, int expectedEntries, int expectedStack,
+        Dictionary<int, StoredItemSnapshot> expectedItems)
     {
-        if (expectedEntries <= 0)
-        {
-            return true;
-        }
-
         List<ItemDrop.ItemData> items = inventory.GetAllItems();
         int actualStack = 0;
         foreach (ItemDrop.ItemData item in items)
@@ -506,13 +505,74 @@ internal static class TankardStorageSystem
             actualStack += Math.Max(0, item.m_stack);
         }
 
-        if (items.Count >= expectedEntries && actualStack >= expectedStack)
+        if (items.Count != expectedEntries || actualStack != expectedStack)
         {
-            return true;
+            WarnIncompleteLoad(tankard, expectedEntries, items.Count, expectedStack, actualStack);
+            return false;
         }
 
-        WarnIncompleteLoad(tankard, expectedEntries, items.Count, expectedStack, actualStack);
-        return false;
+        // Inventory order and dictionary insertion order are not part of the save contract.
+        // Match each saved slot exactly once; equal totals alone can hide replacements or loss.
+        foreach (ItemDrop.ItemData item in items)
+        {
+            int x = item.m_gridPos.x;
+            int y = item.m_gridPos.y;
+            int position = y * 256 + x;
+            if (x < 0 || x > byte.MaxValue || y < 0 || y > byte.MaxValue ||
+                !expectedItems.TryGetValue(position, out StoredItemSnapshot expected))
+            {
+                WarnChangedStorageItem(tankard, x, y, "grid position");
+                return false;
+            }
+
+            expectedItems.Remove(position);
+            string? changedField = FindChangedStorageField(expected, item);
+            if (changedField != null)
+            {
+                WarnChangedStorageItem(tankard, x, y, changedField);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static string? FindChangedStorageField(StoredItemSnapshot expected, ItemDrop.ItemData actual)
+    {
+        if (actual.m_dropPrefab == null || actual.m_dropPrefab.name.GetStableHashCode() != expected.PrefabHash) return "prefab";
+        if (actual.m_stack != expected.Stack) return "stack";
+        if (actual.m_quality != expected.Quality) return "quality";
+        if (actual.m_variant != expected.Variant) return "variant";
+        if (actual.m_crafterID != expected.CrafterId) return "crafter ID";
+        // ItemData.Save omits the crafter name when its ID is zero.
+        if (expected.CrafterId != 0 && !string.Equals(actual.m_crafterName, expected.CrafterName, StringComparison.Ordinal)) return "crafter name";
+        // Use the reader's multiplication, not another Save or division: float rounding
+        // during a second serialization can change the persisted hundredths by one.
+        if (actual.m_durability != (float)expected.Durability * 0.01f) return "durability";
+        if (actual.m_worldLevel != expected.WorldLevel) return "world level";
+        if (actual.m_pickedUp != expected.PickedUp) return "picked-up flag";
+        if (actual.m_equipped != expected.Equipped) return "equipped flag";
+        // The vanilla loader may promote this flag for excessive damage. Never clear it.
+        if (expected.Cheated && !actual.m_cheated) return "cheated flag";
+
+        Dictionary<string, string>? actualData = actual.m_customData;
+        if (actualData == null || actualData.Count != expected.CustomData.Count) return "customData";
+        foreach (KeyValuePair<string, string> entry in actualData)
+        {
+            if (!expected.CustomData.TryGetValue(entry.Key, out string value) ||
+                !string.Equals(entry.Value, value, StringComparison.Ordinal)) return "customData";
+        }
+
+        return null;
+    }
+
+    private sealed class StoredItemSnapshot
+    {
+        internal int PrefabHash, Stack, Quality, Variant, Durability, WorldLevel;
+        internal long CrafterId;
+        internal string CrafterName = "";
+        internal bool PickedUp, Equipped, Cheated;
+        internal Dictionary<string, string> CustomData = new(StringComparer.Ordinal);
     }
 
     private static bool TryReadStorageSummary(
@@ -522,7 +582,8 @@ internal static class TankardStorageSystem
         out int expectedStack,
         out float storedWeight,
         out bool hasCompleteWeight,
-        bool calculateWeight = true)
+        bool calculateWeight = true,
+        Dictionary<int, StoredItemSnapshot>? expectedItems = null)
     {
         version = -1;
         expectedEntries = 0;
@@ -543,38 +604,47 @@ internal static class TankardStorageSystem
 
             for (int i = 0; i < itemCount; ++i)
             {
-                _ = package.ReadInt(); // durability * 100
-                _ = package.ReadByte(); // grid x
-                _ = package.ReadByte(); // grid y
-                _ = package.ReadByte(); // world level
+                int durability = package.ReadInt(); // durability * 100
+                int x = package.ReadByte();
+                int y = package.ReadByte();
+                int worldLevel = package.ReadByte();
                 byte flags = package.ReadByte();
                 int quality = (flags & 4) != 0 ? package.ReadUShort() : 1;
                 int stack = (flags & 8) != 0 ? package.ReadUShort() : 1;
-                if ((flags & 16) != 0)
-                {
-                    _ = package.ReadInt();
-                }
-                if ((flags & 32) != 0)
-                {
-                    _ = package.ReadLong();
-                    _ = package.ReadString();
-                }
+                int variant = (flags & 16) != 0 ? package.ReadInt() : 0;
+                long crafterId = (flags & 32) != 0 ? package.ReadLong() : 0;
+                string crafterName = (flags & 32) != 0 ? package.ReadString() : "";
                 int prefabHash = (flags & 64) != 0 ? package.ReadInt() : 0;
                 if (prefabHash == 0 || stack <= 0 || quality <= 0)
                 {
                     return false;
                 }
+                // Weight-only reads keep the existing non-instantiating, allocation-light path.
+                StoredItemSnapshot? snapshot = expectedItems == null ? null : new StoredItemSnapshot
+                {
+                    PrefabHash = prefabHash, Stack = stack, Quality = quality, Variant = variant,
+                    Durability = durability, WorldLevel = worldLevel,
+                    CrafterId = crafterId, CrafterName = crafterName,
+                    PickedUp = (flags & 1) != 0, Equipped = (flags & 2) != 0
+                };
                 if ((flags & 128) != 0)
                 {
                     int customDataCount = package.ReadNumItems();
                     for (int j = 0; j < customDataCount; ++j)
                     {
-                        _ = package.ReadString();
-                        _ = package.ReadString();
+                        string key = package.ReadString();
+                        string value = package.ReadString();
+                        // Reject duplicate serialized keys rather than silently collapsing them.
+                        snapshot?.CustomData.Add(key, value);
                     }
                 }
 
-                _ = package.ReadByte(); // additional flags, including cheated
+                byte additionalFlags = package.ReadByte();
+                if (snapshot != null)
+                {
+                    snapshot.Cheated = (additionalFlags & 1) != 0;
+                    expectedItems!.Add(y * 256 + x, snapshot);
+                }
 
                 expectedEntries++;
                 expectedStack += Math.Max(0, stack);
@@ -704,7 +774,19 @@ internal static class TankardStorageSystem
             return;
         }
 
-        UsefulTankardsPlugin.Log.LogWarning($"Tankard storage for {tankardName} loaded only {actualEntries}/{expectedEntries} entries and {actualStack}/{expectedStack} stored item stack. The stored data was preserved and the tankard storage was not opened.");
+        UsefulTankardsPlugin.Log.LogWarning($"Tankard storage for {tankardName} restored {actualEntries}/{expectedEntries} expected entries and {actualStack}/{expectedStack} expected total stack. The stored data was preserved and the tankard storage was not opened.");
+    }
+
+    private static void WarnChangedStorageItem(ItemDrop.ItemData tankard, int x, int y, string field)
+    {
+        string tankardName = TankardTweaks.GetCleanPrefabName(tankard);
+        string key = $"{tankardName}:metadata:{x}:{y}:{field}";
+        if (!WarnedIncompleteLoads.Add(key))
+        {
+            return;
+        }
+
+        UsefulTankardsPlugin.Log.LogWarning($"Tankard storage for {tankardName} changed {field} while restoring slot ({x}, {y}). The stored data was preserved and the tankard storage was not opened.");
     }
 
     private static int ResolveStorageSlots(TankardProfile profile)

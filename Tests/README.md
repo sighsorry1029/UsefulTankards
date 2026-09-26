@@ -23,6 +23,18 @@ Coverage includes:
 
 ## Boundary and limitations
 
+### Storage metadata preservation (2026-09-26)
+
+The regression suite now includes exact entry counts and per-slot comparisons of prefab identity, stack, quality, variant, crafter information, durability, world level, picked-up/equipped flags and custom data. It rejects missing/changed/added metadata, equal-total stack redistribution, duplicate positions and unexpected extra items without rewriting the original payload or weight cache. Rejected contents cannot be consumed or presented as a successfully loaded tooltip; an explicit open attempt reports the failure.
+
+Positive cases cover inventory and dictionary reordering, ordinal key comparisons, durability decoded using the original reader's `savedInt * 0.01f`, omission of crafter names with zero ID, and the vanilla loader's promotion of the cheated flag. A saved true cheated flag must survive. The fixture writer now records these fields explicitly and exports independent expected values for the original-reader contract check.
+
+Validation: **84 regression tests passed**. The final merged Debug DLL passed **1,517 instruction references, 30 Harmony targets/injections, 15 reflection contracts, the original private Changed callback and 22 full-field reader fixtures** against preserved Valheim **1.0.16** client build 25527674 and dedicated-server build 25527701 originals. The production Debug build completed with zero warnings/errors; its deployed Steam plugins copy matched the final DLL's SHA-256. No actual game or server session was run for this patch.
+
+Release **1.0.7** also built with zero warnings/errors and passed the same client/server contract and original-reader checks. Its ZIP contains exactly the final merged DLL, README, changelog, manifest and icon; all five files match their packaging sources, and the DLL/manifest version is 1.0.7.
+
+These are controlled game-loader outcomes, not a reproduction of the reported loss in Unity or a dedicated-server session. Other mods' intentional metadata migrations can be rejected; data changed after validation, or a storage key already removed before loading, remains outside this guard. Verify normal storage use and save/reconnect with the actual installed mod combination before treating gameplay compatibility as confirmed.
+
 `GameDoubles.cs` supplies only the game members used by the linked source. Binary fixtures encode inventory field layouts, and a fixture registry prescribes what game `Inventory.Load` returns. A partial-load case deliberately prescribes fewer items. The fixture writer acts as game `Inventory.Save`, making the production code's saved result observable. This verifies the mod's response to those game outcomes; it does **not** validate the real Valheim serializer, all historical save files, prefab construction, or ItemDataManager transfer behavior.
 
 The doubles use managed object references, synchronous inventory events, and explicit `CloseAndDestroy` calls. They do not model Unity's destroyed-object null operator, native components, deferred destruction, `Update` scheduling, Harmony patch application/order, actual `InventoryGui.StackAll` item movement, drag state, RPCs, or network authority. `Player.IsOwner` is an input controlled by each test, not a network simulation. Consumption models the relevant order (status effect application before item removal and the Changed event), not Valheim's full food/status-effect rules.

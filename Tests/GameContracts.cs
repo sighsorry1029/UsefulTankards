@@ -150,12 +150,19 @@ if (args.Length > 2)
             var tuple = load.Invoke(null, new[] { package, Enum.ToObject(versionType, 109) })!;
             var item = tuple.GetType().GetField("Item2")!.GetValue(tuple)!;
             if ((int)tuple.GetType().GetField("Item1")!.GetValue(tuple)! != expected.GetProperty("hash").GetInt32()) throw new Exception("Prefab hash mismatch");
-            foreach (var field in new[] { "stack", "quality" })
+            foreach (var field in new[] { "stack", "quality", "variant", "worldLevel" })
                 if ((int)itemType.GetField("m_" + field)!.GetValue(item)! != expected.GetProperty(field).GetInt32()) throw new Exception(field + " mismatch");
+            if ((float)itemType.GetField("m_durability")!.GetValue(item)! != expected.GetProperty("durability").GetSingle()) throw new Exception("Durability mismatch");
+            if ((long)itemType.GetField("m_crafterID")!.GetValue(item)! != expected.GetProperty("crafterID").GetInt64()) throw new Exception("Crafter ID mismatch");
+            if ((string)itemType.GetField("m_crafterName")!.GetValue(item)! != expected.GetProperty("crafterName").GetString()) throw new Exception("Crafter name mismatch");
+            object position = itemType.GetField("m_gridPos")!.GetValue(item)!;
+            foreach (var axis in new[] { "x", "y" })
+                if ((int)position.GetType().GetField(axis)!.GetValue(position)! != expected.GetProperty(axis).GetInt32()) throw new Exception("Position " + axis + " mismatch");
             var custom = (Dictionary<string, string>)itemType.GetField("m_customData")!.GetValue(item)!;
             var expectedCustom = expected.GetProperty("customData");
             if (custom.Count != expectedCustom.EnumerateObject().Count() || expectedCustom.EnumerateObject().Any(p => custom[p.Name] != p.Value.GetString())) throw new Exception("Custom data mismatch");
-            if (!(bool)itemType.GetField("m_cheated")!.GetValue(item)!) throw new Exception("Cheated flag mismatch");
+            foreach (var field in new[] { "equipped", "pickedUp", "cheated" })
+                if ((bool)itemType.GetField("m_" + field)!.GetValue(item)! != expected.GetProperty(field).GetBoolean()) throw new Exception(field + " flag mismatch");
         }
         if (!Read("GetPos").Equals(Read("Size"))) throw new Exception("Unread item bytes");
         count++;

@@ -60,6 +60,7 @@ internal static class Program
         {
             Run($"v109 custom data count {customCount} and optional fields", f =>
             {
+                SetOptionalMetadata(f.Mead);
                 for (int i = 0; i < customCount; i++) f.Mead.m_customData[$"key{i}"] = $"value{i}";
                 f.SetData(109, f.Mead, f.OtherMead());
                 Equal(f.Mead.GetWeight(), TankardStorageSystem.GetStoredDrinkWeight(f.Tankard), "weight across variable-length fields");
@@ -80,14 +81,141 @@ internal static class Program
         {
             ItemDrop.ItemData missing = f.Mead.Clone();
             missing.m_dropPrefab = new GameObject("removed_mod_mead");
+            missing.m_gridPos = new Vector2i(1, 0);
             f.SetData(109, f.Mead, missing);
             string raw = f.Tankard.m_customData[DataKey];
             InventoryFixtures.LoadedItems[raw] = new[] { f.Mead };
             var opened = f.Open();
             Check(!opened.Storage.LoadComplete, "partial game load must be rejected");
+            Equal(1, Inventory.LoadCalls, "missing prefab scenario reaches the game loader");
             Check(!TankardStorageSystem.IsTankardStorageInventory(opened.Container.Inventory), "partial inventory is not registered");
             opened.Storage.CloseAndDestroy();
             Equal(raw, f.Tankard.m_customData[DataKey], "partial data must not overwrite original");
+        });
+        Run("duplicate serialized grid positions are rejected before loading", f =>
+        {
+            ItemDrop.ItemData duplicate = f.OtherMead();
+            duplicate.m_gridPos = f.Mead.m_gridPos;
+            AssertRejectedWithoutRewrite(f, InventoryFixtures.Encode(109, new[] { f.Mead, duplicate }));
+        });
+
+        foreach (var change in new (string Name, Action<ItemDrop.ItemData> Apply)[]
+        {
+            ("prefab", item => item.m_dropPrefab = new GameObject("different_mead")),
+            ("stack", item => item.m_stack++),
+            ("quality", item => item.m_quality++),
+            ("variant", item => item.m_variant++),
+            ("crafter ID", item => item.m_crafterID++),
+            ("crafter name", item => item.m_crafterName += " changed"),
+            ("durability", item => item.m_durability += 0.25f),
+            ("world level", item => item.m_worldLevel++),
+            ("equipped", item => item.m_equipped = !item.m_equipped),
+            ("picked up", item => item.m_pickedUp = !item.m_pickedUp),
+            ("cleared cheated flag", item => item.m_cheated = false),
+            ("grid coordinate", item => item.m_gridPos = new Vector2i(2, 0)),
+            ("missing custom data", item => item.m_customData.Remove("metadata")),
+            ("changed custom data", item => item.m_customData["metadata"] = "changed"),
+            ("added custom data", item => item.m_customData["unexpected"] = "new"),
+            ("case changed custom-data key", item =>
+            {
+                item.m_customData.Remove("metadata");
+                item.m_customData["Metadata"] = "original";
+            }),
+            ("case changed custom-data value", item => item.m_customData["metadata"] = "Original"),
+            ("case-insensitive loaded dictionary with changed key", item =>
+                item.m_customData = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Metadata"] = "original" })
+        })
+        {
+            Run($"changed {change.Name}: load cannot overwrite original", f =>
+            {
+                SetOptionalMetadata(f.Mead);
+                f.Mead.m_customData["metadata"] = "original";
+                f.SetData(109, f.Mead);
+                ItemDrop.ItemData changed = InventoryFixtures.LoadedItems[f.Tankard.m_customData[DataKey]].Single().Clone();
+                change.Apply(changed);
+                AssertLoadedMismatchPreservesData(f, changed);
+            });
+        }
+        Run("equal total with redistributed stacks cannot overwrite original", f =>
+        {
+            ItemDrop.ItemData second = f.OtherMead();
+            second.m_stack = 2;
+            f.SetData(109, f.Mead, second);
+            ItemDrop.ItemData[] changed = InventoryFixtures.LoadedItems[f.Tankard.m_customData[DataKey]].Select(item => item.Clone()).ToArray();
+            changed[0].m_stack--;
+            changed[1].m_stack++;
+            AssertLoadedMismatchPreservesData(f, changed);
+        });
+        Run("duplicate loaded grid position cannot replace a distinct saved slot", f =>
+        {
+            f.SetData(109, f.Mead, f.OtherMead());
+            ItemDrop.ItemData[] changed = InventoryFixtures.LoadedItems[f.Tankard.m_customData[DataKey]].Select(item => item.Clone()).ToArray();
+            changed[1].m_gridPos = changed[0].m_gridPos;
+            AssertLoadedMismatchPreservesData(f, changed);
+        });
+        foreach (bool empty in new[] { false, true })
+        {
+            Run($"unexpected extra loaded item with original empty={empty} is rejected", f =>
+            {
+                f.SetData(109, empty ? Array.Empty<ItemDrop.ItemData>() : new[] { f.Mead });
+                ItemDrop.ItemData[] changed = InventoryFixtures.LoadedItems[f.Tankard.m_customData[DataKey]]
+                    .Concat(new[] { f.OtherMead() }).ToArray();
+                AssertLoadedMismatchPreservesData(f, changed);
+            });
+        }
+        Run("reordered items and custom-data entries retain their identity", f =>
+        {
+            SetOptionalMetadata(f.Mead);
+            f.Mead.m_customData["first"] = "a";
+            f.Mead.m_customData["second"] = "b";
+            f.SetData(109, f.Mead, f.OtherMead());
+            string raw = f.Tankard.m_customData[DataKey];
+            ItemDrop.ItemData[] reordered = InventoryFixtures.LoadedItems[raw].Reverse().Select(item => item.Clone()).ToArray();
+            foreach (ItemDrop.ItemData item in reordered)
+                item.m_customData = item.m_customData.Reverse().ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+            InventoryFixtures.LoadedItems[raw] = reordered;
+            Check(f.Open().Storage.LoadComplete, "list and dictionary order are not persisted item identity");
+        });
+        Run("durability quantization and unserialized crafter name are accepted", f =>
+        {
+            f.Mead.m_durability = 0.179f;
+            f.Mead.m_crafterID = 0;
+            f.Mead.m_crafterName = "name omitted by the game serializer";
+            f.SetData(109, f.Mead);
+            Check(f.Open().Storage.LoadComplete, "normalized serialized values are compared instead of pre-save fields");
+        });
+        Run("game-promoted cheated flag preserves the load", f =>
+        {
+            f.SetData(109, f.Mead);
+            InventoryFixtures.LoadedItems[f.Tankard.m_customData[DataKey]].Single().m_cheated = true;
+            Check(f.Open().Storage.LoadComplete, "vanilla loader can promote the flag after a damage check");
+        });
+        Run("metadata mismatch is not consumable or shown as verified contents", f =>
+        {
+            f.Mead.m_customData["metadata"] = "original";
+            f.SetData(109, f.Mead);
+            string raw = f.Tankard.m_customData[DataKey];
+            InventoryFixtures.LoadedItems[raw].Single().m_customData.Clear();
+            f.Tankard.m_customData[WeightKey] = "12.5";
+            Check(!TankardStorageSystem.HasConsumableStoredDrink(f.Player, f.Tankard, f.Profile), "incomplete contents cannot be reported available");
+            Check(!TankardStorageSystem.TryConsumeStoredDrinks(f.Player, f.Tankard, f.Profile, out _), "incomplete contents cannot be consumed");
+            Equal(0, f.Player.ConsumeAttempts, "no game consumption attempted");
+            Equal(0, TankardStorageSystem.GetStoredDrinkTooltipLines(f.Tankard).Count, "unverified contents are not displayed");
+            Equal(raw, f.Tankard.m_customData[DataKey], "queries preserve raw contents");
+            Equal("12.5", f.Tankard.m_customData[WeightKey], "queries preserve weight");
+        });
+        Run("opening a metadata mismatch reports failure without showing storage", f =>
+        {
+            f.Mead.m_customData["metadata"] = "original";
+            f.SetData(109, f.Mead);
+            string raw = f.Tankard.m_customData[DataKey];
+            InventoryFixtures.LoadedItems[raw].Single().m_customData.Clear();
+            InventoryGui.instance.Grid.Hovered = f.Tankard;
+            ZInput.UseDown = true;
+            Check(TankardStorageSystem.TryHandleInventoryGuiUseInput(InventoryGui.instance), "Use handled by the owned tankard");
+            Check(InventoryGui.instance.Current == null, "incomplete storage never shown");
+            Equal(1, f.Player.Messages.Count, "one visible failure message");
+            Equal(raw, f.Tankard.m_customData[DataKey], "failed UI opening preserves original");
         });
 
         Run("registry controls admissions and unregisters on close", f =>
@@ -384,6 +512,30 @@ internal static class Program
         Equal(raw, f.Tankard.m_customData[DataKey], "original raw data preserved");
         Equal("12.5", f.Tankard.m_customData[WeightKey], "original weight cache preserved");
     }
+    private static void AssertLoadedMismatchPreservesData(Fixture f, params ItemDrop.ItemData[] loaded)
+    {
+        string raw = f.Tankard.m_customData[DataKey];
+        f.Tankard.m_customData[WeightKey] = "12.5";
+        InventoryFixtures.LoadedItems[raw] = loaded;
+        var opened = f.Open();
+        Check(!opened.Storage.LoadComplete, "changed loaded fields rejected");
+        Equal(1, Inventory.LoadCalls, "prescribed game loader reached once");
+        Check(!TankardStorageSystem.IsTankardStorageInventory(opened.Container.Inventory), "incomplete inventory not registered");
+        ValheimAccess.Changed(opened.Container.Inventory);
+        opened.Storage.Save();
+        opened.Storage.CloseAndDestroy();
+        Equal(raw, f.Tankard.m_customData[DataKey], "save and close preserve original data");
+        Equal("12.5", f.Tankard.m_customData[WeightKey], "save and close preserve original weight");
+    }
+    private static void SetOptionalMetadata(ItemDrop.ItemData item)
+    {
+        item.m_quality = 2;
+        item.m_variant = 7;
+        item.m_crafterID = 123;
+        item.m_crafterName = "fixture crafter";
+        item.m_worldLevel = 2;
+        item.m_equipped = item.m_pickedUp = item.m_cheated = true;
+    }
     private static void Run(string name, Action<Fixture> test)
     {
         try
@@ -427,6 +579,7 @@ internal static class Program
         {
             Inventory.LoadCalls = 0;
             InventoryFixtures.LoadedItems.Clear();
+            UsefulTankardsPlugin.Log.Warnings.Clear();
             TankardTweaks.Profiles.Clear();
             ObjectDB.instance = new();
             Time.frameCount++;
@@ -459,6 +612,7 @@ internal static class Program
         internal ItemDrop.ItemData OtherMead()
         {
             ItemDrop.ItemData item = Item("other_mead", 1);
+            item.m_gridPos = new Vector2i(1, 0);
             item.m_shared.m_itemType = ItemDrop.ItemData.ItemType.Consumable;
             item.m_shared.m_ammoType = "mead";
             item.m_shared.m_consumeStatusEffect = new StatusEffect { name = "effect_other_mead", m_category = "other_mead" };
@@ -523,13 +677,21 @@ internal static class InventoryFixtures
                     package.Writer.Write(entry.Value);
                 }
             }
-            package.Writer.Write((byte)1); // cheated flag must not shift the next item
+            package.Writer.Write((byte)(item.m_cheated ? 1 : 0));
+            // Prescribed successful load follows the original serializer's normalization.
+            item.m_durability = (int)(item.m_durability * 100f) * 0.01f;
+            if (item.m_crafterID == 0) item.m_crafterName = "";
         }
         LoadedItems[package.GetBase64()] = items;
         ContractFixtures[package.GetBase64()] = items.Select(item => new
         {
             hash = PrefabHash(item.m_dropPrefab.name), stack = item.m_stack, quality = item.m_quality,
-            customData = item.m_customData
+            // Fault-injection tests mutate LoadedItems; original-reader expectations must not follow them.
+            customData = new Dictionary<string, string>(item.m_customData, StringComparer.Ordinal), durability = item.m_durability,
+            x = item.m_gridPos.x, y = item.m_gridPos.y, variant = item.m_variant,
+            crafterID = item.m_crafterID, crafterName = item.m_crafterName,
+            worldLevel = item.m_worldLevel, equipped = item.m_equipped,
+            pickedUp = item.m_pickedUp, cheated = item.m_cheated
         }).ToArray();
     }
     internal static void WriteHeader(BinaryWriter writer, int version, int count)
@@ -539,20 +701,23 @@ internal static class InventoryFixtures
     }
     internal static void WriteItemPrefix(BinaryWriter writer, int version, ItemDrop.ItemData item)
     {
-        writer.Write(10000); // fixed-point durability
+        writer.Write((int)(item.m_durability * 100f)); // fixed-point durability
         writer.Write((byte)item.m_gridPos.x);
         writer.Write((byte)item.m_gridPos.y);
-        writer.Write((byte)2); // world level
-        int flags = 1 | 2 | 64;
+        writer.Write((byte)item.m_worldLevel);
+        int flags = 64;
+        if (item.m_pickedUp) flags |= 1;
+        if (item.m_equipped) flags |= 2;
         if (item.m_quality != 1) flags |= 4;
         if (item.m_stack != 1) flags |= 8;
-        // Nonempty custom data fixtures exercise every optional field together.
-        if (item.m_customData.Count > 0) flags |= 16 | 32 | 128;
+        if (item.m_variant != 0) flags |= 16;
+        if (item.m_crafterID != 0) flags |= 32;
+        if (item.m_customData.Count > 0) flags |= 128;
         writer.Write((byte)flags);
         if ((flags & 4) != 0) writer.Write((ushort)item.m_quality);
         if ((flags & 8) != 0) writer.Write((ushort)item.m_stack);
-        if ((flags & 16) != 0) writer.Write(7);
-        if ((flags & 32) != 0) { writer.Write(123L); writer.Write("fixture crafter"); }
+        if ((flags & 16) != 0) writer.Write(item.m_variant);
+        if ((flags & 32) != 0) { writer.Write(item.m_crafterID); writer.Write(item.m_crafterName); }
         writer.Write(PrefabHash(item.m_dropPrefab.name));
     }
     internal static int PrefabHash(string value)
