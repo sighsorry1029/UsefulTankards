@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.8
+
+- Fixed a false durability mismatch that could prevent filled tankards from reopening under Mono's extended-precision arithmetic.
+- Compare restored durability as rounded single-precision values while retaining checks for actual item changes and preserving the original storage data on failure.
+- Added isolated checks using the original game item reader and client/server Mono runtimes, including repeated save/reopen cycles and changed or invalid durability values.
+- Write package manifests as UTF-8 without a byte-order mark.
+
 ## 1.0.7
 
 - Validate each stored mead's identity, quantity, quality, variant, crafter information, and custom data after loading, including other persisted item fields.

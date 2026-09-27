@@ -546,9 +546,7 @@ internal static class TankardStorageSystem
         if (actual.m_crafterID != expected.CrafterId) return "crafter ID";
         // ItemData.Save omits the crafter name when its ID is zero.
         if (expected.CrafterId != 0 && !string.Equals(actual.m_crafterName, expected.CrafterName, StringComparison.Ordinal)) return "crafter name";
-        // Use the reader's multiplication, not another Save or division: float rounding
-        // during a second serialization can change the persisted hundredths by one.
-        if (actual.m_durability != (float)expected.Durability * 0.01f) return "durability";
+        if (!IsStoredDurabilityUnchanged(expected.Durability, actual.m_durability)) return "durability";
         if (actual.m_worldLevel != expected.WorldLevel) return "world level";
         if (actual.m_pickedUp != expected.PickedUp) return "picked-up flag";
         if (actual.m_equipped != expected.Equipped) return "equipped flag";
@@ -564,6 +562,15 @@ internal static class TankardStorageSystem
         }
 
         return null;
+    }
+
+    private static bool IsStoredDurabilityUnchanged(int serializedDurability, float restoredDurability)
+    {
+        // ItemData.Load stores this product in a float field. Mono can retain extra
+        // precision in an inline arithmetic comparison, so even a restored 100f can
+        // fail ==. Single.Equals compares the rounded float values without a tolerance.
+        float expected = (float)serializedDurability * 0.01f;
+        return expected.Equals(restoredDurability);
     }
 
     private sealed class StoredItemSnapshot

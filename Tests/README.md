@@ -33,6 +33,25 @@ Validation: **84 regression tests passed**. The final merged Debug DLL passed **
 
 Release **1.0.7** also built with zero warnings/errors and passed the same client/server contract and original-reader checks. Its ZIP contains exactly the final merged DLL, README, changelog, manifest and icon; all five files match their packaging sources, and the DLL/manifest version is 1.0.7.
 
+### Mono durability comparison regression (2026-09-28)
+
+A user log from UsefulTankards 1.0.7 / Valheim 1.0.16 reported `changed durability` immediately after using storage. The inline comparison of a restored float field with `serializedInt * 0.01f` can compare different precision levels under Mono: the item reader rounds to a float field, while the arithmetic expression can retain extra precision. In the game's Mono with `--optimize=-float32`, the old expression rejected 9 of 11 normal values returned by the original `ItemData.Load`, including durability 100. The .NET 8/9 checks above and Mono's float32 mode did not catch this. This reproduces a runtime-sensitive false rejection, not a complete replay of the user's Unity session or proof of its exact JIT options.
+
+The guard now uses `Single.Equals` on the decoded value. It still rejects changed durability (including 0.001 differences), NaN and infinities; it does not add a tolerance or bypass other metadata checks. `DurabilityMono.cs` invokes both the original reader and the final mod DLL's guard without loading prefabs or initializing BepInEx. It covers normal values, repeated save/reopen quantization and changed/invalid values. `RunGameMono.py` hosts that executable in a separate process using the existing game runtime; it does not launch or attach to a game/server session.
+
+Compile with the installed .NET Framework compiler, then run with Python and explicit game/Managed/BepInEx paths:
+
+```powershell
+& "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /optimize+ /out:Tests\obj\DurabilityMono.exe Tests\DurabilityMono.cs
+$env:USEFULTANKARDS_MONO_OPTIONS = '--optimize=-float32'
+python Tests/RunGameMono.py '<game root>' '<original Managed directory>' Tests/obj/DurabilityMono.exe bin/Debug/UsefulTankards.dll '<BepInEx core directory>'
+# Repeat with --optimize=float32 and with the preserved server runtime/Managed paths.
+```
+
+Validation: the existing **84** storage regression tests passed. Client Mono passed **60** assertions with float32 and **61** with extended intermediates (the latter also asserts that the old bug reproduces); preserved server Mono passed **61** with extended intermediates. The final Debug DLL passed **1,518** instruction references, **30** Harmony targets, **15** reflection contracts and **22** original-reader fixtures for both client/server 1.0.16. Build succeeded with zero warnings/errors using the supplied Gale profile's BepInEx references; Steam and the `asdfasdf` profile received the same final DLL via MSBuild, with matching SHA-256. Actual Unity gameplay and the reported server session still require retesting.
+
+Release **1.0.8** passed the same original client/server contract checks and all three Mono runs against its final merged DLL (client float32/extended precision, server extended precision). The Release build completed with zero warnings/errors. All five ZIP entries match their packaging sources; DLL/manifest versions match 1.0.8 and the packaged manifest is valid UTF-8 without a BOM.
+
 These are controlled game-loader outcomes, not a reproduction of the reported loss in Unity or a dedicated-server session. Other mods' intentional metadata migrations can be rejected; data changed after validation, or a storage key already removed before loading, remains outside this guard. Verify normal storage use and save/reconnect with the actual installed mod combination before treating gameplay compatibility as confirmed.
 
 `GameDoubles.cs` supplies only the game members used by the linked source. Binary fixtures encode inventory field layouts, and a fixture registry prescribes what game `Inventory.Load` returns. A partial-load case deliberately prescribes fewer items. The fixture writer acts as game `Inventory.Save`, making the production code's saved result observable. This verifies the mod's response to those game outcomes; it does **not** validate the real Valheim serializer, all historical save files, prefab construction, or ItemDataManager transfer behavior.

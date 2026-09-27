@@ -18,10 +18,11 @@ $iconPath = Join-Path $packageDir "icon.png"
 $readmePath = Join-Path $ProjectDir "README.md"
 $changelogPath = Join-Path $packageDir "CHANGELOG.md"
 
-$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+$manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $manifest.version_number = $version
 $manifestJson = $manifest | ConvertTo-Json -Depth 16
-$manifestJson | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+[System.IO.File]::WriteAllText($manifestPath, $manifestJson + [Environment]::NewLine, $utf8NoBom)
 
 Get-ChildItem -LiteralPath $packageDir -Filter "$AssemblyName-*.zip" -File -ErrorAction SilentlyContinue | Remove-Item -Force
 
@@ -35,7 +36,7 @@ try {
     Copy-Item -LiteralPath $iconPath -Destination (Join-Path $stagingDir "icon.png") -Force
 
     $stagedManifestPath = Join-Path $stagingDir "manifest.json"
-    $manifestJson | Set-Content -LiteralPath $stagedManifestPath -Encoding UTF8
+    [System.IO.File]::WriteAllText($stagedManifestPath, $manifestJson + [Environment]::NewLine, $utf8NoBom)
 
     $zipPath = Join-Path $packageDir ($AssemblyName + "-" + $version + ".zip")
 
