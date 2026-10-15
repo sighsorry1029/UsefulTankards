@@ -12,7 +12,7 @@ The project links the actual `../TankardStorage.cs`. It tests that source's pars
 
 Coverage includes:
 
-- Inventory version 109, compact flag-dependent fields, ushort counts, custom-data counts at 127/128, quality-adjusted weight, and weight queries without `Inventory.Load`.
+- Inventory versions 109/110, compact flag-dependent fields, ushort counts, custom-data counts at 127/128, quality-adjusted weight, and weight queries without `Inventory.Load`.
 - Unsupported versions, malformed base64, truncated fields, invalid stacks, excessive declared counts, trailing bytes, and incomplete game loads preserving the original serialized data when closed.
 - Registry membership, null-owner re-registration, ammo policy, removal on close, and immediate-save handler detachment.
 - Consuming from an open storage inventory and closing it without restoring consumed items, including consuming the final item.
@@ -22,6 +22,24 @@ Coverage includes:
 - Routing local stack-all only for the active, open, completely loaded, owned tankard UI; ordinary containers remain unhandled.
 
 ## Boundary and limitations
+
+### Valheim 1.0.20 storage format (2026-10-15)
+
+Current checks support 109/110 and save as 110. Version 109's serialized cheated bit is
+consumed but cleared by the original game reader; version 110 retains it. The summary
+uses that same expected interpretation. A 110 true flag cleared by another loader still
+fails completeness validation, and vanilla promotion from false to true remains allowed.
+Unknown 111 and malformed/incomplete inputs remain protected without rewriting.
+
+Validation: **91 linked-source tests passed**. The final merged Debug DLL passed
+**1,518 instruction references, 30 Harmony targets/injections, 15 reflection contracts
+and 34 full-field fixtures** against original 1.0.20 client 25909357/server 25909431.
+A separate original-Mono/final-DLL probe passed 56 shared storage checks for each role;
+the previous UsefulTankards DLL failed its 109 cheated interpretation check.
+The shared probe source and evidence are preserved at
+`C:/Users/blizz/.codex/references/valheim/comparisons/1.0.20-four-mods-patch-20261015/`.
+No actual tankard UI, prefab loading or multiplayer session was executed. The dated
+1.0.16 results below remain historical evidence, not the current cheated policy.
 
 ### Storage metadata preservation (2026-09-26)
 
@@ -67,8 +85,8 @@ The harness targets .NET 8 while production targets .NET Framework 4.8. `CS8600`
 After the production Debug build, export the regression fixtures and run the .NET 9 / Mono.Cecil checker:
 
 ```powershell
-dotnet run --project Tests/StorageRegression.csproj -c Debug -- Tests/obj/v109-fixtures.json
-dotnet run --project Tests/GameContracts.csproj -c Debug -p:BaseIntermediateOutputPath=obj/GameContracts/ -p:BaseOutputPath=bin/GameContracts/ -- bin/Debug/UsefulTankards.dll 'C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed' Tests/obj/v109-fixtures.json
+dotnet run --project Tests/StorageRegression.csproj -c Debug -- Tests/obj/v109-v110-fixtures.json
+dotnet run --project Tests/GameContracts.csproj -c Debug -p:BaseIntermediateOutputPath=obj/GameContracts/ -p:BaseOutputPath=bin/GameContracts/ -- bin/Debug/UsefulTankards.dll 'C:\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed' Tests/obj/v109-v110-fixtures.json
 ```
 
 Supply the preserved original dedicated-server Managed directory as the second argument to repeat against the server API. Keep the intermediate/output overrides: the two test projects share this directory.
@@ -77,7 +95,7 @@ This checks all merged game/Unity instruction references, detects field instruct
 
 2026-09-09 results: **43 storage tests passed**; **1,444 instruction references, 30 Harmony targets, 15 reflection contracts and 12 original-reader fixtures passed** for both Valheim 1.0.7 client/server originals. The private Changed invocation notified its callback exactly once. These are managed-code/metadata tests, not Harmony installation or actual Unity/Mono gameplay tests.
 
-Still required in Valheim: fresh plugin initialization; client/host/dedicated-server config synchronization and ownership checks; open, drink, drag/stack/move/drop, close and reconnect/save-load round trips; optional ValheimCuisine/custom meads; missing prefabs; animation restoration; and shutdown/event cleanup. Existing embedded storage versions other than 109 are intentionally rejected without rewriting; no legacy migration is tested or provided.
+Still required in Valheim: fresh plugin initialization; client/host/dedicated-server config synchronization and ownership checks; open, drink, drag/stack/move/drop, close and reconnect/save-load round trips; optional ValheimCuisine/custom meads; missing prefabs; animation restoration; and shutdown/event cleanup. Existing embedded storage versions other than 109/110 are intentionally rejected without rewriting; no separate legacy migration is provided.
 
 ## EpicLoot input compatibility (2026-09-14)
 

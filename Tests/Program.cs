@@ -10,19 +10,44 @@ internal static class Program
 
     private static int Main(string[] args)
     {
+        foreach (int version in new[] { 109, 110 })
         foreach (int stack in new[] { 1, 3, 65535 })
         {
-            Run($"v109 stack {stack}: summary weight and complete inventory load", f =>
+            Run($"v{version} stack {stack}: summary weight and complete inventory load", f =>
             {
                 f.Mead.m_quality = stack == 1 ? 1 : 2;
                 f.Mead.m_stack = stack;
-                f.SetData(109, f.Mead);
+                f.SetData(version, f.Mead);
                 Equal(f.Mead.GetWeight(), TankardStorageSystem.GetStoredDrinkWeight(f.Tankard), "weight");
                 Equal(0, Inventory.LoadCalls, "weight lookup must not instantiate/load items");
                 var opened = f.Open();
                 Check(opened.Storage.LoadComplete, "supported fixture must load");
                 Equal(stack, opened.Container.Inventory.GetAllItems().Single().m_stack, "stack survives load");
                 Check(TankardStorageSystem.IsTankardStorageInventory(opened.Container.Inventory), "loaded storage registers");
+            });
+        }
+
+        foreach (int version in new[] { 109, 110 })
+        foreach (bool cheated in new[] { false, true })
+        {
+            Run($"v{version} cheated={cheated}: load, save110 and reopen", f =>
+            {
+                SetOptionalMetadata(f.Mead);
+                f.Mead.m_cheated = cheated;
+                f.Mead.m_customData["metadata"] = "original";
+                f.SetData(version, f.Mead);
+                var opened = f.Open();
+                Check(opened.Storage.LoadComplete, "supported clean-slate load succeeds");
+                bool expected = version == 110 && cheated;
+                Equal(expected, opened.Container.Inventory.GetAllItems().Single().m_cheated, "game cheated interpretation");
+                opened.Storage.CloseAndDestroy();
+                Equal(110, new ZPackage(f.Tankard.m_customData[DataKey]).ReadInt(), "save uses current game format");
+                var reopened = f.Open();
+                Check(reopened.Storage.LoadComplete, "saved v110 reopens");
+                var item = reopened.Container.Inventory.GetAllItems().Single();
+                Equal(expected, item.m_cheated, "resave preserves interpreted cheated state");
+                Equal(f.Mead.m_stack, item.m_stack, "resave preserves stack");
+                Equal("original", item.m_customData["metadata"], "resave preserves metadata");
             });
         }
 
@@ -34,7 +59,7 @@ internal static class Program
             Equal(0, ObjectDB.instance!.LookupCount, "validation discarded weight, so no prefab lookup is needed");
         });
 
-        foreach (int version in new[] { 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 110 })
+        foreach (int version in new[] { 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 111 })
         {
             Run($"unsupported version {version}: raw data survives close", f =>
                 AssertRejectedWithoutRewrite(f, InventoryFixtures.EncodeHeader(version, 1)));
@@ -130,7 +155,7 @@ internal static class Program
             {
                 SetOptionalMetadata(f.Mead);
                 f.Mead.m_customData["metadata"] = "original";
-                f.SetData(109, f.Mead);
+                f.SetData(110, f.Mead);
                 ItemDrop.ItemData changed = InventoryFixtures.LoadedItems[f.Tankard.m_customData[DataKey]].Single().Clone();
                 change.Apply(changed);
                 AssertLoadedMismatchPreservesData(f, changed);
@@ -681,6 +706,8 @@ internal static class InventoryFixtures
             // Prescribed successful load follows the original serializer's normalization.
             item.m_durability = (int)(item.m_durability * 100f) * 0.01f;
             if (item.m_crafterID == 0) item.m_crafterName = "";
+            // The original 1.0.20 reader consumes the old bit without applying it.
+            if (version == 109) item.m_cheated = false;
         }
         LoadedItems[package.GetBase64()] = items;
         ContractFixtures[package.GetBase64()] = items.Select(item => new

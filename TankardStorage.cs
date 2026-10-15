@@ -601,9 +601,9 @@ internal static class TankardStorageSystem
         {
             ZPackage package = new(rawData);
             version = package.ReadInt();
-            // Valheim 1.0.7 Inventory.Save / ItemData.Save use the compact v109 layout.
+            // Valheim 1.0.20 keeps the compact v109 layout in v110, but resets old cheated flags.
             // Reject other layouts before loading so an incomplete inventory cannot overwrite them.
-            if (version != 109)
+            if (version != 109 && version != 110)
             {
                 return false;
             }
@@ -649,7 +649,7 @@ internal static class TankardStorageSystem
                 byte additionalFlags = package.ReadByte();
                 if (snapshot != null)
                 {
-                    snapshot.Cheated = (additionalFlags & 1) != 0;
+                    snapshot.Cheated = version >= 110 && (additionalFlags & 1) != 0;
                     expectedItems!.Add(y * 256 + x, snapshot);
                 }
 

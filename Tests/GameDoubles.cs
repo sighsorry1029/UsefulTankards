@@ -140,7 +140,7 @@ public sealed class Inventory
         // Tests prescribe the game loader's outcome, including missing-prefab/partial loads.
         _items.AddRange(InventoryFixtures.LoadedItems[package.GetBase64()].Select(item => item.Clone()));
     }
-    public void Save(ZPackage package) => InventoryFixtures.Write(package, 109, _items);
+    public void Save(ZPackage package) => InventoryFixtures.Write(package, 110, _items);
     public bool RemoveItem(ItemDrop.ItemData item, int amount)
     {
         if (!_items.Contains(item) || item.m_stack < amount) return false;

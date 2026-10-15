@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.9
+
+- Updated tankard storage for Valheim 1.0.20's item save format 110, while retaining support for format 109.
+- Matched the game's version-specific cheated-item flag handling so valid stored meads are not rejected when reopening a tankard.
+- Retained item identity, quantity, and metadata validation and preservation of original storage data on failure. Added regression checks for both supported formats and repeated save/reopen cycles.
+
 ## 1.0.8
 
 - Fixed a false durability mismatch that could prevent filled tankards from reopening under Mono's extended-precision arithmetic.

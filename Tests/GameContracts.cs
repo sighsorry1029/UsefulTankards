@@ -144,10 +144,11 @@ if (args.Length > 2)
     {
         var package = Activator.CreateInstance(packageType, fixture.Name)!;
         object Read(string method) => packageType.GetMethod(method, Type.EmptyTypes)!.Invoke(package, null)!;
-        if ((int)Read("ReadInt") != 109 || (ushort)Read("ReadUShort") != fixture.Value.GetArrayLength()) throw new Exception("Header mismatch");
+        int version = (int)Read("ReadInt");
+        if ((version != 109 && version != 110) || (ushort)Read("ReadUShort") != fixture.Value.GetArrayLength()) throw new Exception("Header mismatch");
         foreach (var expected in fixture.Value.EnumerateArray())
         {
-            var tuple = load.Invoke(null, new[] { package, Enum.ToObject(versionType, 109) })!;
+            var tuple = load.Invoke(null, new[] { package, Enum.ToObject(versionType, version) })!;
             var item = tuple.GetType().GetField("Item2")!.GetValue(tuple)!;
             if ((int)tuple.GetType().GetField("Item1")!.GetValue(tuple)! != expected.GetProperty("hash").GetInt32()) throw new Exception("Prefab hash mismatch");
             foreach (var field in new[] { "stack", "quality", "variant", "worldLevel" })
