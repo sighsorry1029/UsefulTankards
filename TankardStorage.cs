@@ -161,7 +161,7 @@ internal static class TankardStorageSystem
             !InventoryGui.IsVisible() ||
             Player.m_localPlayer == null ||
             !ZInput.GetButtonDown("Use") ||
-            EpicLootStorageCompatibility.ShouldYieldUse)
+            EpicLootStorageCompatibility.ShouldYieldUse(inventoryGui))
         {
             return false;
         }
@@ -192,18 +192,6 @@ internal static class TankardStorageSystem
         if (!player.IsOwner() || !player.GetInventory().ContainsItem(hoveredItem))
         {
             return false;
-        }
-
-        if (EpicLootStorageCompatibility.IsSocketGridOpen)
-        {
-            // Show alone does not close EpicLoot's overlay. Its CloseContainer prefix
-            // saves sockets, removes SaveSockets, and restores the container buttons.
-            ValheimAccess.CloseContainer(inventoryGui);
-            if (EpicLootStorageCompatibility.IsSocketGridOpen || Player.m_localPlayer != player ||
-                !player.IsOwner() || !player.GetInventory().ContainsItem(hoveredItem))
-            {
-                return false;
-            }
         }
 
         OpenTankardStorage(player, hoveredItem, profile);

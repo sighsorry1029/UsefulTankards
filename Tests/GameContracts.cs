@@ -97,27 +97,28 @@ if (args.Length > 3)
 {
     using var epic = AssemblyDefinition.ReadAssembly(args[3]);
     foreach (var contract in new[] {
-        ("EpicLoot.InventoryPromptHost", "IsOpen"),
-        ("EpicLoot.ShardStones.SocketsUI", "IsSocketGridOpen") })
+        ("EpicLoot.InventoryPromptHost", "get_IsOpen", "", "System.Boolean"),
+        ("EpicLoot.ShardStones.SocketOverlayInput", "IsShardSlotPress", "InventoryGui", "System.Boolean"),
+        ("EpicLoot.API", "RegisterItemContainer", "System.String,System.Func`2<ItemDrop/ItemData,System.Boolean>", "System.Boolean"),
+        ("EpicLoot.API", "UnregisterItemContainer", "System.String", "System.Boolean"),
+        ("EpicLoot.API", "GetRegisteredProviders", "", "System.Collections.Generic.Dictionary`2<System.String,System.Collections.Generic.List`1<System.String>>") })
     {
-        var getter = epic.MainModule.GetType(contract.Item1).Properties.Single(p => p.Name == contract.Item2).GetMethod;
-        if (!getter.IsStatic || getter.Parameters.Count != 0 || getter.ReturnType.FullName != "System.Boolean")
-            throw new Exception($"EpicLoot flag delegate contract changed: {contract}");
+        var method = epic.MainModule.GetType(contract.Item1).Methods.Single(m => m.Name == contract.Item2 &&
+            string.Join(",", m.Parameters.Select(p => p.ParameterType.FullName)) == contract.Item3);
+        if (!method.IsStatic || method.HasGenericParameters || method.ReturnType.FullName != contract.Item4)
+            throw new Exception($"EpicLoot delegate contract changed: {contract}");
     }
-    var modifier = epic.MainModule.GetType("EpicLoot.Config.ELConfig").Fields.Single(f => f.Name == "SocketOverlayModifier");
-    if (!modifier.IsStatic || modifier.FieldType.FullName != "BepInEx.Configuration.ConfigEntry`1<UnityEngine.KeyCode>")
-        throw new Exception("EpicLoot modifier contract changed");
     int PriorityOf(Mono.Cecil.ICustomAttributeProvider target) => (int)target.CustomAttributes
         .Single(a => a.AttributeType.FullName == "HarmonyLib.HarmonyPriority").ConstructorArguments[0].Value;
     var ourUpdate = mod.MainModule.GetType("UsefulTankards.UsefulTankardsInventoryGuiUpdatePatch");
-    var epicUpdate = epic.MainModule.GetType("EpicLoot.ShardStones.SocketsUI").NestedTypes.Single(t => t.Name == "InventoryGui_Update_Patch");
+    var epicUpdate = epic.MainModule.GetType("EpicLoot.ShardStones.ShardUI").NestedTypes.Single(t => t.Name == "InventoryGui_Update_Patch");
     // Require the priority on Prefix itself. A class-only value passes a raw
     // metadata check but is lost by the installed HarmonyX's attribute merge.
     if (PriorityOf(ourUpdate.Methods.Single(m => m.Name == "Prefix")) <= PriorityOf(epicUpdate))
         throw new Exception("Tankard input must precede EpicLoot input");
     if (mod.MainModule.AssemblyReferences.Any(r => r.Name is "EpicLoot" or "Newtonsoft.Json"))
         throw new Exception("Optional storage integration introduced a runtime assembly dependency");
-    Console.WriteLine("PASS EpicLoot 3 reflection contracts, input priority, and optional assembly boundary (metadata only)");
+    Console.WriteLine("PASS 5 current EpicLoot delegate contracts, explicit input priority, and optional assembly boundary");
 }
 
 if (args.Length > 2)

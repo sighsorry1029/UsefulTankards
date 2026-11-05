@@ -484,46 +484,152 @@ internal static class Program
             });
         }
         foreach (bool open in new[] { false, true })
+        foreach (bool prompt in new[] { false, true })
         {
-            Run($"EpicLoot modifier/prompt veto preserves input with tankard open={open}", f =>
+            Run($"EpicLoot GUI shortcut/prompt={prompt} veto preserves input with tankard open={open}", f =>
             {
+                EnableEpicLoot();
                 if (open) f.Open();
                 var gui = InventoryGui.instance;
                 gui.Grid.Hovered = f.Tankard;
                 var original = gui.Current;
-                EpicLootStorageCompatibility.ShouldYieldUse = true;
+                EpicLoot.InventoryPromptHost.Open = prompt;
+                EpicLoot.ShardStones.SocketOverlayInput.Press = !prompt;
                 ZInput.UseDown = true;
                 Check(!TankardStorageSystem.TryHandleInventoryGuiUseInput(gui), "EpicLoot retains input");
                 Check(ZInput.UseDown && gui.Current == original && gui.CloseCalls == 0, "no consumption or UI change");
+                if (!prompt) Check(ReferenceEquals(gui, EpicLoot.ShardStones.SocketOverlayInput.LastGui), "actual GUI passed to shortcut overload");
             });
         }
-        foreach (string outcome in new[] { "closed", "still open", "item removed" })
+        Run("independent shard panel does not force a container close", f =>
         {
-            Run($"socket overlay transition: {outcome}", f =>
-            {
-                var gui = InventoryGui.instance;
-                gui.Grid.Hovered = f.Tankard;
-                EpicLootStorageCompatibility.IsSocketGridOpen = true;
-                bool saved = false;
-                gui.OnClose = () =>
-                {
-                    Check(gui.Current == null, "old UI saved before tankard Show");
-                    saved = true;
-                    EpicLootStorageCompatibility.IsSocketGridOpen = outcome == "still open";
-                    if (outcome == "item removed") f.Player.GetInventory().RemoveItem(f.Tankard, 1);
-                };
-                ZInput.UseDown = true;
-                bool handled = TankardStorageSystem.TryHandleInventoryGuiUseInput(gui);
-                Check(saved && gui.CloseCalls == 1, "normal close path called once");
-                Equal(outcome == "closed", handled, "only safe transition opens storage");
-                Equal(outcome == "closed", gui.Current != null, "no overlapping UI or removed item opened");
-            });
-        }
+            EnableEpicLoot();
+            var gui = InventoryGui.instance;
+            gui.Grid.Hovered = f.Tankard;
+            gui.OnClose = () => throw new InvalidOperationException("Unexpected legacy socket container transition");
+            ZInput.UseDown = true;
+            Check(TankardStorageSystem.TryHandleInventoryGuiUseInput(gui), "tankard opens on ordinary Use");
+            Equal(0, gui.CloseCalls, "no synthetic socket close");
+        });
+        Run("registered tankard predicate reads live storage configuration", f =>
+        {
+            EnableEpicLoot();
+            var predicate = EpicLoot.API.Providers[UsefulTankardsPlugin.ModGuid];
+            Check(predicate(f.Tankard) && !predicate(f.Mead) && !predicate(null!), "only configured tankards registered");
+            f.Profile.TankardStorageSlots = 0;
+            Check(!predicate(f.Tankard), "disabled storage stops claiming bare Use");
+            f.Profile.TankardStorageSlots = 4;
+            Check(predicate(f.Tankard), "re-enabled storage needs no registration rebuild");
+        });
+        Run("existing same-ID registration is preserved on initialization rejection", f =>
+        {
+            Func<ItemDrop.ItemData, bool> prior = _ => true;
+            EpicLoot.API.Providers[UsefulTankardsPlugin.ModGuid] = prior;
+            EnableEpicLoot();
+            Check(EpicLootStorageCompatibility.ShouldYieldUse(InventoryGui.instance), "input integration stopped");
+            Check(ReferenceEquals(prior, EpicLoot.API.Providers[UsefulTankardsPlugin.ModGuid]), "prior registration preserved");
+            Equal(0, EpicLoot.API.RegisterCalls, "duplicate precheck avoids registration side effects");
+            Equal(0, EpicLoot.API.UnregisterCalls, "no unowned removal");
+        });
+        Run("rejected registration does not unregister an unowned provider", f =>
+        {
+            EpicLoot.API.Reject = true;
+            EnableEpicLoot();
+            Check(EpicLootStorageCompatibility.ShouldYieldUse(InventoryGui.instance), "rejected registration disables integration");
+            Equal(0, EpicLoot.API.UnregisterCalls, "false return is not owned registration");
+        });
+        Run("missing registry category prevents an unverifiable registration", f =>
+        {
+            EpicLoot.API.MissingCategory = true;
+            EnableEpicLoot();
+            Check(EpicLootStorageCompatibility.ShouldYieldUse(InventoryGui.instance), "missing registry category yields input");
+            Equal(0, EpicLoot.API.RegisterCalls, "no registration without ownership precheck");
+        });
+        Run("registration event exception rolls back only our inserted provider", f =>
+        {
+            EpicLoot.API.Providers["other.mod"] = _ => true;
+            EpicLoot.API.ThrowAfterRegister = true;
+            EnableEpicLoot();
+            Check(EpicLootStorageCompatibility.ShouldYieldUse(InventoryGui.instance), "failed registration is not treated as enabled");
+            Check(!EpicLoot.API.Providers.ContainsKey(UsefulTankardsPlugin.ModGuid) && EpicLoot.API.Providers.ContainsKey("other.mod"), "rollback is scoped");
+        });
+        foreach (bool prompt in new[] { false, true })
+        Run($"delegate exception stops integration and unregisters container: prompt={prompt}", f =>
+        {
+            EnableEpicLoot();
+            var predicate = EpicLoot.API.Providers[UsefulTankardsPlugin.ModGuid];
+            EpicLoot.InventoryPromptHost.Throw = prompt;
+            EpicLoot.ShardStones.SocketOverlayInput.Throw = !prompt;
+            Check(EpicLootStorageCompatibility.ShouldYieldUse(InventoryGui.instance), "failed delegate yields input");
+            Check(!predicate(f.Tankard) && !EpicLoot.API.Providers.ContainsKey(UsefulTankardsPlugin.ModGuid), "disabled callback cannot claim bare Use");
+            int warnings = UsefulTankardsPlugin.Log.Warnings.Count;
+            Check(EpicLootStorageCompatibility.ShouldYieldUse(InventoryGui.instance), "subsequent input stays disabled");
+            Equal(warnings, UsefulTankardsPlugin.Log.Warnings.Count, "failure logged once");
+        });
+        Run("predicate failure does not mutate provider dictionary during enumeration", f =>
+        {
+            EnableEpicLoot();
+            TankardTweaks.ThrowProfileLookup = true;
+            Check(EpicLoot.API.Providers.Values.All(predicate => !predicate(f.Tankard)), "failed predicate is inactive");
+            Check(EpicLoot.API.Providers.ContainsKey(UsefulTankardsPlugin.ModGuid), "cleanup deferred out of enumeration");
+            Check(EpicLootStorageCompatibility.ShouldYieldUse(InventoryGui.instance), "input boundary remains disabled");
+            Check(!EpicLoot.API.Providers.ContainsKey(UsefulTankardsPlugin.ModGuid), "input boundary completes cleanup");
+            TankardTweaks.ThrowProfileLookup = false;
+        });
+        Run("Reset releases only its registration and supports reinitialization", f =>
+        {
+            EpicLoot.API.Providers["other.mod"] = _ => true;
+            EnableEpicLoot();
+            EpicLootStorageCompatibility.Reset();
+            Check(EpicLoot.API.Providers.Count == 1 && EpicLoot.API.Providers.ContainsKey("other.mod"), "own callback removed");
+            EpicLootStorageCompatibility.Initialize();
+            Check(EpicLoot.API.Providers[UsefulTankardsPlugin.ModGuid](f.Tankard), "callback re-registered after reset");
+        });
+        Run("failed unregister keeps callback inactive until cleanup retry", f =>
+        {
+            EnableEpicLoot();
+            var predicate = EpicLoot.API.Providers[UsefulTankardsPlugin.ModGuid];
+            EpicLoot.API.ThrowUnregister = true;
+            EpicLootStorageCompatibility.Reset();
+            Check(!predicate(f.Tankard), "retained callback cannot take input while unavailable");
+            EpicLoot.API.ThrowUnregister = false;
+            EpicLootStorageCompatibility.Reset();
+            Check(!EpicLoot.API.Providers.ContainsKey(UsefulTankardsPlugin.ModGuid), "later reset retries cleanup");
+        });
+        Run("missing current API stops input integration without altering storage", f =>
+        {
+            BepInEx.Bootstrap.Chainloader.PluginInfos[EpicLootStorageCompatibility.PluginGuid] = new() { Instance = "missing API assembly" };
+            EpicLootStorageCompatibility.Initialize();
+            Check(EpicLootStorageCompatibility.ShouldYieldUse(InventoryGui.instance), "missing contract yields input");
+            f.SetData(110, f.Mead);
+            var storage = f.Open();
+            Check(storage.Storage.LoadComplete, "storage reader remains available");
+        });
 
         if (args.Length > 0)
             File.WriteAllText(args[0], System.Text.Json.JsonSerializer.Serialize(InventoryFixtures.ContractFixtures));
         Console.WriteLine($"{_passed} passed, {_failed} failed");
         return _failed == 0 ? 0 : 1;
+    }
+
+    private static void EnableEpicLoot()
+    {
+        BepInEx.Bootstrap.Chainloader.PluginInfos[EpicLootStorageCompatibility.PluginGuid] = new();
+        EpicLootStorageCompatibility.Initialize();
+    }
+
+    private static void ResetEpicLoot()
+    {
+        EpicLoot.API.ThrowUnregister = false;
+        EpicLootStorageCompatibility.Reset();
+        EpicLoot.API.Providers.Clear();
+        BepInEx.Bootstrap.Chainloader.PluginInfos.Clear();
+        EpicLoot.API.Reject = EpicLoot.API.ThrowAfterRegister = EpicLoot.API.MissingCategory = false;
+        EpicLoot.API.RegisterCalls = EpicLoot.API.UnregisterCalls = 0;
+        EpicLoot.InventoryPromptHost.Open = EpicLoot.InventoryPromptHost.Throw = false;
+        EpicLoot.ShardStones.SocketOverlayInput.Press = EpicLoot.ShardStones.SocketOverlayInput.Throw = false;
+        EpicLoot.ShardStones.SocketOverlayInput.LastGui = null;
+        TankardTweaks.ThrowProfileLookup = false;
     }
 
     private static void AssertRejectedWithoutRewrite(Fixture f, string raw)
@@ -602,6 +708,7 @@ internal static class Program
         private readonly List<TankardStorageSystem.TankardStorageContainer> _opened = new();
         internal Fixture()
         {
+            ResetEpicLoot();
             Inventory.LoadCalls = 0;
             InventoryFixtures.LoadedItems.Clear();
             UsefulTankardsPlugin.Log.Warnings.Clear();
@@ -658,8 +765,7 @@ internal static class Program
             InventoryGui.instance.OnClose = null;
             TankardStorageSystem.CloseOpenTankardStorage();
             foreach (var storage in _opened) storage.CloseAndDestroy();
-            EpicLootStorageCompatibility.ShouldYieldUse = false;
-            EpicLootStorageCompatibility.IsSocketGridOpen = false;
+            ResetEpicLoot();
             ZInput.UseDown = false;
             Player.m_localPlayer = null;
         }

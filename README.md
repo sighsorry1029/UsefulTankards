@@ -47,7 +47,7 @@ Storage loading verifies each saved item's identity, quantity and metadata befor
 
 When a tankard is used, UsefulTankards checks the stored meads and drinks any that can currently be consumed. Food rules, potion categories, and active status effect categories are respected.
 
-With EpicLoot's socket UI installed, Use opens tankard storage before EpicLoot consumes the input. Hold EpicLoot's configured `Socket Overlay Modifier` (normally LeftAlt) with Use to leave the input to its socket UI. EpicLoot confirmation prompts retain control, and switching from sockets to tankard storage closes and saves the socket UI first. Keep NewtonsoftJsonDetector installed; it is a required dependency of EpicLoot. This optional integration targets the UI contracts in EpicLoot 0.14.5; changed or missing contracts produce one startup warning and leave Use input to EpicLoot.
+With EpicLoot installed, ordinary Use opens enabled tankard storage. EpicLoot confirmation prompts and its configured shard-panel shortcuts retain control, including remapped keys and gamepad focus. Storage-enabled tankards register with EpicLoot's item-container API so its bare Use shortcut does not also open the shard panel. The current shard panel is independent and does not require closing a shared container. This optional integration was checked against EpicLoot 0.15.6 and binds its required methods once, without a version allowlist or legacy fallback. Missing contracts or callback failures disable only this storage-input integration and log a warning; stored contents are preserved. Keep NewtonsoftJsonDetector installed as required by EpicLoot.
 
 ## Potion And Buff Bonuses
 

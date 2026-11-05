@@ -125,6 +125,9 @@ public sealed class ItemDrop : Component
 
 public sealed class Inventory
 {
+    public bool CanAddItem(ItemDrop.ItemData item, int amount = 1) => true;
+    public bool AddItem(ItemDrop.ItemData item) { _items.Add(item); return true; }
+    public bool MoveItemToThis(Inventory source, ItemDrop.ItemData item) => throw new NotSupportedException();
     private readonly List<ItemDrop.ItemData> _items = new();
     internal Action? OnChanged;
     internal static int LoadCalls;
@@ -156,6 +159,9 @@ public sealed class Container : Component
     public Inventory Inventory = null!;
     public bool InUse;
     public Inventory GetInventory() => Inventory;
+    public bool IsOwner() => true;
+    public void SetInUse(bool value) => InUse = value;
+    public void StackAll() => throw new NotSupportedException();
 }
 
 public sealed class Player : Component
@@ -216,6 +222,7 @@ public sealed class ObjectDB
 }
 public sealed class InventoryGui : Component
 {
+    public void Hide() => throw new NotSupportedException();
     public static InventoryGui instance = null!;
     internal Container? Current;
     internal int StackAllCalls;
@@ -250,18 +257,14 @@ namespace UsefulTankards
         internal const string StorageLoadFailedKey = "$ut_tankard_storage_load_failed";
         internal static string Localize(string key) => key;
     }
-    // External UI state is prescribed here; this does not execute EpicLoot or Harmony.
-    internal static class EpicLootStorageCompatibility
-    {
-        internal static bool ShouldYieldUse;
-        internal static bool IsSocketGridOpen;
-    }
     internal sealed class TankardProfile { internal int TankardStorageSlots = 3; }
     internal static class TankardTweaks
     {
+        internal static bool ThrowProfileLookup;
         internal static readonly Dictionary<ItemDrop.ItemData.SharedData, TankardProfile> Profiles = new();
         internal static bool TryGetProfile(ItemDrop.ItemData? item, out TankardProfile profile)
         {
+            if (ThrowProfileLookup) throw new InvalidOperationException("Injected profile failure");
             profile = null!;
             if (item == null || !Profiles.TryGetValue(item.m_shared, out TankardProfile? found)) return false;
             profile = found;
@@ -271,15 +274,18 @@ namespace UsefulTankards
     }
     internal static class UsefulTankardsPlugin
     {
+        internal const string ModGuid = "sighsorry.UsefulTankards";
         internal static readonly TestLogger Log = new();
         internal sealed class TestLogger
         {
             internal readonly List<string> Warnings = new();
             internal void LogWarning(string message) => Warnings.Add(message);
+            internal void LogInfo(string message) { }
         }
     }
     internal static class ValheimAccess
     {
+        internal static void SetContainerInUse(Container container, bool value) => container.InUse = value;
         internal static Container? GetCurrentContainer(InventoryGui? gui) => gui?.Current;
         internal static InventoryGrid? GetPlayerGrid(InventoryGui gui) => gui.Grid;
         internal static void CloseContainer(InventoryGui gui)

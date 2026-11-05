@@ -8,7 +8,9 @@ dotnet run --project Tests/StorageRegression.csproj --configuration Debug
 
 The console runner returns exit code 1 when any case fails. It has no NuGet package dependencies. Build outputs stay under `Tests/bin` and `Tests/obj`; the production .NET Framework project does not compile these files.
 
-The project links the actual `../TankardStorage.cs`. It tests that source's parsing, storage registry, admission checks, item ownership checks, live-inventory reuse, serialization decisions, event cleanup, cache invalidation, and stack-all dispatch guards. It does not copy those policies into a second implementation.
+The project links the actual `../TankardStorage.cs` and `../StoragePatches.cs`. It tests parsing, storage registry, admission checks, item ownership checks, live-inventory reuse, serialization decisions, event cleanup, cache invalidation, stack-all dispatch guards, and the EpicLoot adapter. It does not copy those policies into a second implementation.
+
+The EpicLoot adapter tests bind to controlled API types in `EpicLootDoubles.cs`. They cover the GUI-aware shortcut overload, prompt/shortcut input vetoes, live configured-tankard registration, duplicate-ID preservation, rejected/throwing registration, callback failures, deferred cleanup outside provider enumeration, reset/reinitialization, and missing contracts. The item-only shortcut overload deliberately throws so an incorrect binding fails. These tests do not implement or execute EpicLoot's keyboard/gamepad policy or apply Harmony detours; actual EpicLoot and Unity input remain separate integration checks.
 
 Coverage includes:
 
@@ -22,6 +24,36 @@ Coverage includes:
 - Routing local stack-all only for the active, open, completely loaded, owned tankard UI; ordinary containers remain unhandled.
 
 ## Boundary and limitations
+
+### Current EpicLoot adapter (2026-11-05)
+
+Validation: **102 linked-source tests passed**. The final merged Debug DLL passed
+**1,533 instruction references, 30 Harmony targets/injections, 15 game reflection
+contracts, 5 EpicLoot delegate contracts, and 34 original-reader fixtures** against
+the installed original game assemblies and supplied EpicLoot **0.15.6**. The adapter
+uses `InventoryPromptHost.IsOpen`, the internal GUI-aware
+`SocketOverlayInput.IsShardSlotPress(InventoryGui)`, and the item-container API.
+No version/hash allowlist or old socket-overlay fallback is used.
+
+Pass `EpicLoot.dll` as the fourth argument to `GameContracts` to include its five
+exact static signatures, relative input priority and optional assembly boundary.
+Run `HarmonyInputOrder.ps1` below with the current DLLs to verify real Harmony
+attribute merging without applying detours. Debug build/deployment completed with
+zero warnings/errors and matching source/Steam DLL hashes. No Release package or
+version change was made during that Debug validation.
+
+The subsequent **1.0.10** Release passed the same final-DLL contract and reader
+checks. Actual Harmony class processing resolved UsefulTankards input priority
+**801** and EpicLoot's current shard UI priority **400**. The five ZIP entries
+match their source files; assembly, file, plugin and manifest versions agree on
+1.0.10, and the manifest is UTF-8 without a BOM.
+
+Still required in Unity: EpicLoot absent/present; bare Use, remapped shortcuts,
+keyboard modifiers, focused/unfocused gamepad grids, confirmation prompts, and
+the independent shard panel; opening, consuming and closing storage; live slot
+configuration changes; shutdown and reinitialization. These checks do not execute
+EpicLoot's actual input policy or a host/client/dedicated-server session. Older
+results below are historical and do not imply current legacy-overlay support.
 
 ### Valheim 1.0.20 storage format (2026-10-15)
 
@@ -97,11 +129,11 @@ This checks all merged game/Unity instruction references, detects field instruct
 
 Still required in Valheim: fresh plugin initialization; client/host/dedicated-server config synchronization and ownership checks; open, drink, drag/stack/move/drop, close and reconnect/save-load round trips; optional ValheimCuisine/custom meads; missing prefabs; animation restoration; and shutdown/event cleanup. Existing embedded storage versions other than 109/110 are intentionally rejected without rewriting; no separate legacy migration is provided.
 
-## EpicLoot input compatibility (2026-09-14)
+## Historical EpicLoot input compatibility (2026-09-14)
 
-The storage harness now passes **56 tests**, including 13 input/transition cases. They exercise the production input handler with prescribed external UI state: opening and closing, input consumption, hidden UI, ordinary items, disabled storage, ownership/membership, world containers, no input, EpicLoot veto with storage open/closed, and socket close callbacks that succeed, leave the overlay open, or remove the tankard. The doubles do not execute EpicLoot's prompt/modifier getters, socket serialization, or Harmony ordering.
+The earlier storage harness passed **56 tests**, including 13 input/transition cases. They exercised the then-current input handler with prescribed external UI state, including the old socket-overlay close transition. That transition and the old prompt/modifier contracts have been replaced by the current adapter described above.
 
-Pass the supplied `EpicLoot.dll` as a fourth argument to `GameContracts` (after the fixture JSON) to check the two static bool getters, configured modifier field, relative Update patch priority, and absence of a hard EpicLoot/Newtonsoft assembly reference. These are original metadata checks, not execution of the optional accessors in Unity/Mono.
+The earlier checker covered two static bool getters and the configured modifier field. The current checker instead requires the five contracts described above; an old EpicLoot DLL is not a current adapter test target.
 
 Validated against EpicLoot's BepInPlugin version **0.14.5** (DLL SHA-256 `9A0B06F3E05E8880F985AD68158D847750DA5F73EAEDEFABE5E047CE7ABEF103`). Its assembly file version still reads 0.13.0. The final Debug DLL passed **1,469 instruction references, 30 Harmony targets, 15 game reflection contracts, 3 EpicLoot reflection contracts, and 12 original-reader fixtures** against Valheim **1.0.12** client build 25253764 and dedicated-server build 25253791 originals. Production build: zero warnings/errors; deployed to the default Steam game's BepInEx/plugins directory with matching SHA-256. No Release package was generated for this compatibility patch.
 

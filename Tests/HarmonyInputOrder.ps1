@@ -1,5 +1,5 @@
 param(
-    [string]$TankardsDll = "$PSScriptRoot\..\bin\Debug\UsefulTankards.dll",
+    [string]$TankardsDll,
     [string]$FishingDll,
     [Parameter(Mandatory = $true)]
     [string]$EpicLootDll,
@@ -8,6 +8,7 @@ param(
 # Run with Windows PowerShell (.NET Framework). Uses the installed Harmony class
 # processor on real patch types, but never calls Patch or any Unity/game method.
 $ErrorActionPreference = 'Stop'
+if (!$TankardsDll) { $TankardsDll = Join-Path $PSScriptRoot '..\bin\Debug\UsefulTankards.dll' }
 $script:referencePaths = @("$GamePath\BepInEx\core", "$GamePath\valheim_Data\Managed", (Split-Path $EpicLootDll))
 $resolveAssembly = [ResolveEventHandler] {
     param($sender, $request)
@@ -38,7 +39,7 @@ try {
         }
         throw "Prefix missing: $typeName"
     }
-    $epicPriority = Read-PrefixPriority $EpicLootDll 'EpicLoot.ShardStones.SocketsUI+InventoryGui_Update_Patch'
+    $epicPriority = Read-PrefixPriority $EpicLootDll 'EpicLoot.ShardStones.ShardUI+InventoryGui_Update_Patch'
     $tankardPriority = Read-PrefixPriority $TankardsDll 'UsefulTankards.UsefulTankardsInventoryGuiUpdatePatch'
     if ($tankardPriority -le $epicPriority) { throw 'Tankard input does not precede EpicLoot after actual Harmony attribute merging' }
     if ($FishingDll) {

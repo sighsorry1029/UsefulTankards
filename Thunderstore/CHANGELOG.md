@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.10
+
+- Restored native tankard storage input compatibility with EpicLoot's current UI, verified against EpicLoot 0.15.6. Confirmation prompts and configured socket shortcuts retain their input, including GUI focus and gamepad targeting.
+- Register configured tankards with EpicLoot's item-container API so bare Use opens their storage. Removed the old socket-overlay close transition because the shard panel is independent.
+- Bind required contracts once without a version allowlist or legacy fallback. Failed registration or callbacks disable only storage-input integration, preserve other providers, and clean up owned registrations on reset or shutdown.
+- Added regression coverage for input selection, live storage configuration, registration rollback, callback failures, cleanup, and actual Harmony priority processing.
+- Updated the packaged BepInEx dependency to `denikson-BepInExPack_Valheim-5.4.2360`.
+
 ## 1.0.9
 
 - Updated tankard storage for Valheim 1.0.20's item save format 110, while retaining support for format 109.
